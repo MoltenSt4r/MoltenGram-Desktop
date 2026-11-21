@@ -1961,7 +1961,7 @@ void PartGeneral7(SectionBuilder &builder) {
 			.onClick = [=] {
 				Extera::PillStack::ShowSettingsBox(controller);
 			},
-			.keywords = { u"molten"_q, u"pill" , u"stack"_q, u"ping"_q, u"weather"_q, u"rates"_q, u"ram"_q, u"speed"_q },
+			.keywords = { u"molten"_q, u"pill"_q, u"stack"_q, u"ping"_q, u"weather"_q, u"rates"_q, u"ram"_q, u"speed"_q },
 		});
 		AddToggle(
 			builder,

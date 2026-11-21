@@ -267,6 +267,14 @@ constexpr auto kSaveDelay = crl::time(1000);
 		{ u"pillstack_location_lat"_q, QString("52.5200") },
 		{ u"pillstack_location_lon"_q, QString("13.4050") },
 		{ u"pillstack_rate_pair"_q, 0 },
+		{ u"pillstack_speed_mode"_q, 0 },
+		{ u"pillstack_ram_mode"_q, 0 },
+
+		{ u"spoof_device_enabled"_q, false },
+		{ u"spoof_device_preset"_q, u"moltenstar"_q },
+		{ u"spoof_custom_model"_q, QString() },
+		{ u"spoof_custom_sys_ver"_q, QString() },
+		{ u"spoof_custom_app_ver"_q, QString() },
 
 		{ u"nowplaying_enabled"_q, false },
 		{ u"nowplaying_to_bio"_q, true },
