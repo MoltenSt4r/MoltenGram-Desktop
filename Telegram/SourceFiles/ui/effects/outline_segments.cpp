@@ -7,6 +7,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "ui/effects/outline_segments.h"
 
+#include "extera/molten_avatar_shapes.h"
+
 namespace Ui {
 
 void PaintOutlineSegments(
@@ -15,6 +17,16 @@ void PaintOutlineSegments(
 		const std::vector<OutlineSegment> &segments,
 		float64 fromFullProgress) {
 	Expects(!segments.empty());
+
+	if (const auto md3Shape = Extera::AvatarShapes::ActiveShapeId(); md3Shape > 0) {
+		Extera::AvatarShapes::PaintStoryRing(
+			p,
+			ellipse,
+			md3Shape,
+			segments.back().brush,
+			segments.back().width);
+		return;
+	}
 
 	p.setBrush(Qt::NoBrush);
 	const auto count = std::min(int(segments.size()), kOutlineSegmentsMax);

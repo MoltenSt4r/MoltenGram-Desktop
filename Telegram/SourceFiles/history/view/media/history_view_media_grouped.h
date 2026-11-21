@@ -7,6 +7,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #pragma once
 
+#include "extera/molten_media_carousel.h"
 #include "history/view/media/history_view_media.h"
 #include "data/data_document.h"
 #include "data/data_photo.h"
@@ -154,8 +155,12 @@ private:
 
 	[[nodiscard]] Media *lookupSpoilerTagMedia() const;
 	[[nodiscard]] QImage generateSpoilerTagBackground(QRect full) const;
+	[[nodiscard]] bool useCarousel() const;
+	[[nodiscard]] ClickHandlerPtr carouselStepHandler(int targetIndex) const;
 
 	mutable std::optional<HistoryItem*> _captionItem;
+	mutable Extera::MediaCarousel::State _carouselState;
+	mutable Extera::MediaCarousel::Layout _carouselLayout;
 	std::vector<Part> _parts;
 	Mode _mode = Mode::Grid;
 	bool _needBubble : 1 = false;

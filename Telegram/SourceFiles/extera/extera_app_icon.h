@@ -7,6 +7,8 @@ struct Variant {
 	QColor from;
 	QColor to;
 	QColor fg;
+	QString title;
+	QString resourcePath;
 };
 
 [[nodiscard]] std::vector<Variant> Variants();

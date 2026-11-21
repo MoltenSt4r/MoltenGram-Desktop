@@ -1,42 +1,61 @@
 #include "extera/extera_full_player.h"
 
+#include "api/api_common.h"
+#include "apiwrap.h"
+#include "base/call_delayed.h"
+#include "base/timer.h"
+#include "core/application.h"
+#include "core/core_settings.h"
 #include "data/data_document.h"
 #include "data/data_document_media.h"
 #include "data/data_file_origin.h"
+#include "data/data_saved_music.h"
+#include "data/data_session.h"
+#include "data/data_user.h"
+#include "extera/extera_config.h"
+#include "extera/extera_plugins.h"
+#include "extera/molten_playlists.h"
+#include "history/history.h"
+#include "history/history_item.h"
 #include "lang/lang_keys.h"
 #include "main/main_session.h"
 #include "media/audio/media_audio.h"
-#include "media/player/media_player_instance.h"
-#include "ui/effects/animations.h"
-#include "ui/image/image.h"
-#include "ui/layers/generic_box.h"
-#include "ui/painter.h"
-#include "ui/style/style_core.h"
-#include "window/window_session_controller.h"
-#include "core/application.h"
-#include "core/core_settings.h"
-#include "data/data_session.h"
 #include "media/media_common.h"
-#include "ui/layers/box_content.h"
-#include "base/call_delayed.h"
+#include "media/player/media_player_instance.h"
+#include "settings.h"
+#include "styles/style_layers.h"
 #include "styles/style_media_player.h"
 #include "styles/style_menu_icons.h"
 #include "styles/style_settings.h"
-
-#include <QtGui/QClipboard>
-#include <QtGui/QGuiApplication>
-#include "styles/style_layers.h"
-#include "extera/extera_plugins.h"
-#include "ui/widgets/popup_menu.h"
 #include "styles/style_widgets.h"
+#include "ui/effects/animations.h"
+#include "ui/image/image.h"
+#include "ui/layers/box_content.h"
+#include "ui/layers/generic_box.h"
+#include "ui/painter.h"
+#include "ui/style/style_core.h"
+#include "ui/widgets/popup_menu.h"
+#include "window/window_session_controller.h"
 
+#include <QtCore/QCryptographicHash>
+#include <QtCore/QDir>
+#include <QtCore/QElapsedTimer>
+#include <QtCore/QFile>
 #include <QtCore/QJsonArray>
 #include <QtCore/QJsonDocument>
 #include <QtCore/QJsonObject>
 #include <QtCore/QRegularExpression>
+#include <QtCore/QSaveFile>
+#include <QtCore/QStandardPaths>
+#include <QtCore/QTimer>
 #include <QtCore/QUrlQuery>
+#include <QtGui/QClipboard>
+#include <QtGui/QGuiApplication>
 #include <QtNetwork/QNetworkAccessManager>
 #include <QtNetwork/QNetworkReply>
+
+#include <cmath>
+#include <numbers>
 
 namespace Extera::FullPlayer {
 namespace {
@@ -70,9 +89,76 @@ enum class Button {
 	Line,
 	Shuffle,
 	Repeat,
+	Playlists,
 	ShowMessage,
 	CopyLyrics,
+	Heart,
 };
+
+constexpr auto kLongPressMs = crl::time(500);
+constexpr auto kWaveTau = 2.0 * std::numbers::pi;
+
+[[nodiscard]] bool ConfigBoolDefaultTrue(const QString &key) {
+	const auto value = Extera::Config::Instance().valueOf(key);
+	return value.isBool() ? value.toBool() : true;
+}
+
+[[nodiscard]] bool WavySeekbarEnabled() {
+	return ConfigBoolDefaultTrue(u"player_wavy_seekbar"_q);
+}
+
+[[nodiscard]] bool OnlineCoverEnabled() {
+	return ConfigBoolDefaultTrue(u"player_online_cover"_q);
+}
+
+[[nodiscard]] QString CoverCacheDir() {
+	const auto base = cWorkingDir().isEmpty()
+		? QStandardPaths::writableLocation(
+			QStandardPaths::CacheLocation)
+		: (cWorkingDir() + u"tdata"_q);
+	return base + u"/molten_covers"_q;
+}
+
+[[nodiscard]] QString CoverCachePath(const QString &key) {
+	const auto hash = QCryptographicHash::hash(
+		key.toUtf8(),
+		QCryptographicHash::Md5).toHex();
+	return CoverCacheDir() + u"/"_q + QString::fromLatin1(hash) + u".jpg"_q;
+}
+
+void PaintHeartIcon(
+		QPainter &p,
+		QPoint center,
+		float64 radius,
+		const QColor &color,
+		bool filled) {
+	const auto cx = float64(center.x());
+	const auto cy = float64(center.y());
+	const auto s = radius;
+	auto path = QPainterPath();
+	path.moveTo(cx, cy + s * 0.78);
+	path.cubicTo(
+		cx - s * 1.15, cy + s * 0.05,
+		cx - s * 1.05, cy - s * 0.95,
+		cx, cy - s * 0.32);
+	path.cubicTo(
+		cx + s * 1.05, cy - s * 0.95,
+		cx + s * 1.15, cy + s * 0.05,
+		cx, cy + s * 0.78);
+	path.closeSubpath();
+
+	p.save();
+	if (filled) {
+		p.setPen(Qt::NoPen);
+		p.setBrush(color);
+		p.drawPath(path);
+	} else {
+		p.setBrush(Qt::NoBrush);
+		p.setPen(QPen(color, std::max(1.5, radius * 0.19), Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
+		p.drawPath(path);
+	}
+	p.restore();
+}
 
 [[nodiscard]] std::vector<Line> ParseSynced(const QString &text) {
 	static const auto re = QRegularExpression(
@@ -193,6 +279,13 @@ private:
 	base::unique_qptr<Ui::PopupMenu> _pluginMenu;
 	void checkCover();
 	void applyCover(QImage image);
+	void fetchOnlineCover();
+	void fetchDeezerCover(int requestId, const QString &term, const QString &cachePath);
+	void downloadOnlineCover(int requestId, const QUrl &url, const QString &cachePath);
+	void toggleProfileMusic();
+	void saveToSavedMessages();
+	void updateWaveTimer();
+	[[nodiscard]] bool isSavedToProfile() const;
 	void requestLyrics();
 	void tryLyrics(
 		int requestId,
@@ -242,9 +335,19 @@ private:
 	bool _seeking = false;
 	float64 _seekValue = 0.;
 	Button _over = Button::None;
+	Button _pressedButton = Button::None;
+	bool _longPressTriggered = false;
+	base::Timer _longPressTimer;
+
+	QTimer _waveTimer;
+	QElapsedTimer _waveClock;
+	float64 _waveAmplitude = 0.;
+	float64 _wavePhase = 0.;
 
 	QNetworkAccessManager *_network = nullptr;
 	int _requestId = 0;
+	int _coverRequestId = 0;
+	bool _onlineCoverRequested = false;
 	Lyrics _lyrics = Lyrics::Loading;
 	std::vector<Line> _lines;
 	int _linesWidth = 0;
@@ -277,8 +380,41 @@ View::View(
 , _bottom(QColor(18, 18, 22))
 , _wasTop(_top)
 , _wasBottom(_bottom)
+, _longPressTimer([=] {
+	if (_pressedButton == Button::Heart) {
+		_longPressTriggered = true;
+		saveToSavedMessages();
+	} else if (_pressedButton == Button::Playlists) {
+		_longPressTriggered = true;
+		Extera::Playlists::ShowPlaylistsBox(_controller);
+	}
+})
 , _network(new QNetworkAccessManager(this)) {
 	setMouseTracking(true);
+
+	_waveTimer.setInterval(16);
+	connect(&_waveTimer, &QTimer::timeout, this, [=] {
+		const auto dt = _waveClock.isValid()
+			? std::min(0.05, _waveClock.restart() / 1000.0)
+			: 0.016;
+		const auto playing = Media::Player::ShowPauseIcon(_state.state);
+		const auto isWavy = style::Md3Enabled() && WavySeekbarEnabled();
+		const auto maxAmp = float64(S(4));
+		const auto targetAmp = (playing && isWavy) ? maxAmp : 0.0;
+		_waveAmplitude += (targetAmp - _waveAmplitude)
+			* (1.0 - std::pow(0.85, dt / 0.04));
+		if (std::abs(_waveAmplitude - targetAmp) < 0.05) {
+			_waveAmplitude = targetAmp;
+		}
+		if (_waveAmplitude > 0.0) {
+			_wavePhase = std::fmod(_wavePhase + 6.0 * dt, kWaveTau);
+		}
+		update(sliderRect().marginsAdded(QMargins(S(8), S(16), S(8), S(16))));
+		if (_waveAmplitude == 0.0 && targetAmp == 0.0) {
+			_waveTimer.stop();
+			_waveClock.invalidate();
+		}
+	});
 
 	const auto instance = Media::Player::instance();
 	instance->updatedNotifier(
@@ -289,6 +425,7 @@ View::View(
 		if (state.id.audio() != _document) {
 			loadTrack();
 		}
+		updateWaveTimer();
 		updateCurrentLine();
 		update();
 	}, lifetime());
@@ -305,8 +442,16 @@ View::View(
 		checkCover();
 	}, lifetime());
 
+	auto &savedMusic = controller->session().data().savedMusic();
+	savedMusic.loadIds();
+	savedMusic.changed(
+	) | rpl::on_next([=] {
+		update();
+	}, lifetime());
+
 	_state = instance->getState(Type::Song);
 	loadTrack();
+	updateWaveTimer();
 }
 
 int View::resizeGetHeight(int newWidth) {
@@ -365,9 +510,16 @@ void View::loadTrack() {
 		_media = document->createMediaView();
 		_media->thumbnailWanted(Data::FileOriginMessage(_context));
 	}
+	++_coverRequestId;
+	_onlineCoverRequested = false;
 	applyCover(QImage());
 	checkCover();
+	if (_cover.isNull()
+		&& (!document || !document->hasThumbnail())) {
+		fetchOnlineCover();
+	}
 	requestLyrics();
+	updateWaveTimer();
 	update();
 }
 
@@ -377,6 +529,174 @@ void View::checkCover() {
 	}
 	if (const auto image = _media->thumbnail()) {
 		applyCover(image->original());
+	} else if (_document
+		&& !_document->thumbnailLoading()
+		&& !_onlineCoverRequested) {
+		fetchOnlineCover();
+	}
+}
+
+void View::fetchOnlineCover() {
+	if (_onlineCoverRequested || !OnlineCoverEnabled() || _title.isEmpty()) {
+		return;
+	}
+	_onlineCoverRequested = true;
+	const auto artist = CleanTitle(_performer);
+	const auto title = CleanTitle(_title);
+	const auto term = (artist.isEmpty() ? title : (artist + u" "_q + title)).trimmed();
+	if (term.isEmpty()) {
+		return;
+	}
+	const auto cachePath = CoverCachePath(term.toLower());
+	if (QFile::exists(cachePath)) {
+		if (auto cached = QImage(cachePath); !cached.isNull()) {
+			applyCover(std::move(cached));
+			return;
+		}
+	}
+
+	const auto requestId = ++_coverRequestId;
+	auto query = QUrlQuery();
+	query.addQueryItem(u"term"_q, term);
+	query.addQueryItem(u"media"_q, u"music"_q);
+	query.addQueryItem(u"entity"_q, u"song"_q);
+	query.addQueryItem(u"limit"_q, u"1"_q);
+	auto url = QUrl(u"https://itunes.apple.com/search"_q);
+	url.setQuery(query);
+	auto request = QNetworkRequest(url);
+	request.setHeader(QNetworkRequest::UserAgentHeader, u"Mozilla/5.0"_q);
+	const auto reply = _network->get(request);
+	connect(reply, &QNetworkReply::finished, this, [=] {
+		reply->deleteLater();
+		if (requestId != _coverRequestId || !_cover.isNull()) {
+			return;
+		}
+		const auto results = QJsonDocument::fromJson(reply->readAll()).object()
+			.value(u"results"_q).toArray();
+		if (!results.isEmpty()) {
+			auto art = results.first().toObject()
+				.value(u"artworkUrl100"_q).toString();
+			if (!art.isEmpty()) {
+				art.replace(u"100x100bb"_q, u"600x600bb"_q);
+				downloadOnlineCover(requestId, QUrl(art), cachePath);
+				return;
+			}
+		}
+		fetchDeezerCover(requestId, term, cachePath);
+	});
+}
+
+void View::fetchDeezerCover(
+		int requestId,
+		const QString &term,
+		const QString &cachePath) {
+	auto query = QUrlQuery();
+	query.addQueryItem(u"q"_q, term);
+	query.addQueryItem(u"limit"_q, u"1"_q);
+	auto url = QUrl(u"https://api.deezer.com/search"_q);
+	url.setQuery(query);
+	auto request = QNetworkRequest(url);
+	request.setHeader(QNetworkRequest::UserAgentHeader, u"Mozilla/5.0"_q);
+	const auto reply = _network->get(request);
+	connect(reply, &QNetworkReply::finished, this, [=] {
+		reply->deleteLater();
+		if (requestId != _coverRequestId || !_cover.isNull()) {
+			return;
+		}
+		const auto data = QJsonDocument::fromJson(reply->readAll()).object()
+			.value(u"data"_q).toArray();
+		if (!data.isEmpty()) {
+			const auto art = data.first().toObject()
+				.value(u"album"_q).toObject()
+				.value(u"cover_xl"_q).toString();
+			if (!art.isEmpty()) {
+				downloadOnlineCover(requestId, QUrl(art), cachePath);
+			}
+		}
+	});
+}
+
+void View::downloadOnlineCover(
+		int requestId,
+		const QUrl &url,
+		const QString &cachePath) {
+	if (!url.isValid()) {
+		return;
+	}
+	auto request = QNetworkRequest(url);
+	request.setHeader(QNetworkRequest::UserAgentHeader, u"Mozilla/5.0"_q);
+	const auto reply = _network->get(request);
+	connect(reply, &QNetworkReply::finished, this, [=] {
+		reply->deleteLater();
+		if (requestId != _coverRequestId
+			|| !_cover.isNull()
+			|| reply->error() != QNetworkReply::NoError) {
+			return;
+		}
+		const auto bytes = reply->readAll();
+		auto image = QImage();
+		if (!image.loadFromData(bytes) || image.isNull()) {
+			return;
+		}
+		QDir().mkpath(CoverCacheDir());
+		auto save = QSaveFile(cachePath);
+		if (save.open(QIODevice::WriteOnly)) {
+			save.write(bytes);
+			save.commit();
+		}
+		applyCover(std::move(image));
+	});
+}
+
+bool View::isSavedToProfile() const {
+	return _document
+		&& _controller->session().data().savedMusic().has(_document);
+}
+
+void View::toggleProfileMusic() {
+	if (!_document) {
+		return;
+	}
+	auto &savedMusic = _controller->session().data().savedMusic();
+	if (savedMusic.has(_document)) {
+		savedMusic.remove(_document);
+		_controller->showToast(u"Removed from profile music"_q);
+	} else {
+		savedMusic.save(_document, Data::FileOriginMessage(_context));
+		_controller->showToast(u"Saved to profile music"_q);
+	}
+	update();
+}
+
+void View::saveToSavedMessages() {
+	auto &session = _controller->session();
+	const auto item = session.data().message(_context);
+	if (!item) {
+		_controller->showToast(u"Cannot save this track to Saved Messages"_q);
+		return;
+	}
+	if (item->forbidsForward()) {
+		_controller->showToast(u"Forwarding is restricted for this track"_q);
+		return;
+	}
+	const auto savedHistory = session.data().history(session.user());
+	session.api().forwardMessages(
+		Data::ResolvedForwardDraft{
+			.items = { item },
+			.options = Data::ForwardOptions::PreserveInfo,
+		},
+		Api::SendAction(savedHistory));
+	_controller->showToast(u"Saved to Saved Messages"_q);
+}
+
+void View::updateWaveTimer() {
+	const auto playing = Media::Player::ShowPauseIcon(_state.state);
+	const auto isWavy = style::Md3Enabled() && WavySeekbarEnabled();
+	if ((playing && isWavy) || _waveAmplitude > 0.0) {
+		if (!_waveTimer.isActive()) {
+			_waveClock.start();
+			_waveTimer.start();
+		}
 	}
 }
 
@@ -638,10 +958,12 @@ QPoint View::buttonCenter(Button button) const {
 	switch (button) {
 	case Button::Previous: return QPoint(x - S(76), y);
 	case Button::Next: return QPoint(x + S(76), y);
-	case Button::Shuffle: return QPoint(x - S(105), row);
-	case Button::Repeat: return QPoint(x - S(35), row);
-	case Button::ShowMessage: return QPoint(x + S(35), row);
-	case Button::CopyLyrics: return QPoint(x + S(105), row);
+	case Button::Shuffle: return QPoint(x - S(116), row);
+	case Button::Repeat: return QPoint(x - S(58), row);
+	case Button::Playlists: return QPoint(x, row);
+	case Button::ShowMessage: return QPoint(x + S(58), row);
+	case Button::CopyLyrics: return QPoint(x + S(116), row);
+	case Button::Heart: return QPoint(cover.right() - S(16), S(348));
 	default: return QPoint(x, y);
 	}
 }
@@ -731,8 +1053,10 @@ Button View::buttonAt(QPoint point, int *line) const {
 	for (const auto button : {
 			Button::Shuffle,
 			Button::Repeat,
+			Button::Playlists,
 			Button::ShowMessage,
-			Button::CopyLyrics }) {
+			Button::CopyLyrics,
+			Button::Heart }) {
 		const auto center = buttonCenter(button);
 		if ((point - center).manhattanLength() <= S(22)) {
 			return button;
@@ -795,7 +1119,14 @@ void View::mousePressEvent(QMouseEvent *e) {
 	if (e->button() != Qt::LeftButton) {
 		return;
 	}
-	if (buttonAt(e->pos()) == Button::Slider && length() > 0) {
+	const auto button = buttonAt(e->pos());
+	_pressedButton = button;
+	_longPressTriggered = false;
+	_longPressTimer.cancel();
+	if (button == Button::Heart || button == Button::Playlists) {
+		_longPressTimer.callOnce(kLongPressMs);
+	}
+	if (button == Button::Slider && length() > 0) {
 		_seeking = true;
 		Media::Player::instance()->startSeeking(Type::Song);
 		mouseMoveEvent(e);
@@ -806,18 +1137,40 @@ void View::mouseReleaseEvent(QMouseEvent *e) {
 	if (e->button() != Qt::LeftButton) {
 		return;
 	}
+	_longPressTimer.cancel();
+	const auto wasLongPress = std::exchange(_longPressTriggered, false);
+	_pressedButton = Button::None;
 	if (_seeking) {
 		_seeking = false;
 		Media::Player::instance()->finishSeeking(Type::Song, _seekValue);
 		update();
 		return;
 	}
+	if (wasLongPress) {
+		return;
+	}
 	auto line = -1;
 	const auto instance = Media::Player::instance();
 	switch (buttonAt(e->pos(), &line)) {
-	case Button::Previous: instance->previous(Type::Song); break;
-	case Button::Next: instance->next(Type::Song); break;
+	case Button::Previous:
+		if (!Extera::Playlists::HasActiveQueue() || !Extera::Playlists::PlayPrevious()) {
+			instance->previous(Type::Song);
+		}
+		break;
+	case Button::Next:
+		if (!Extera::Playlists::HasActiveQueue() || !Extera::Playlists::PlayNext()) {
+			instance->next(Type::Song);
+		}
+		break;
 	case Button::Play: instance->playPause(Type::Song); break;
+	case Button::Heart: toggleProfileMusic(); break;
+	case Button::Playlists:
+		if (_document) {
+			Extera::Playlists::ShowAddToPlaylistBox(_controller, _document, _context);
+		} else {
+			Extera::Playlists::ShowPlaylistsBox(_controller);
+		}
+		break;
 	case Button::Shuffle: {
 		auto &settings = Core::App().settings();
 		settings.setPlayerOrderMode(
@@ -948,18 +1301,33 @@ void View::paintEvent(QPaintEvent *e) {
 void View::paintControlsMd3(QPainter &p) {
 	const auto colors = ExdPalette();
 	const auto cover = coverRect();
+	const auto textWidth = cover.width() - S(42);
 	p.setPen(colors.fg);
 	p.setFont(_titleFont->f);
 	p.drawText(
-		QRect(cover.x(), S(326), cover.width(), _titleFont->height),
+		QRect(cover.x(), S(326), textWidth, _titleFont->height),
 		Qt::AlignLeft | Qt::AlignVCenter,
-		_titleFont->elided(_title, cover.width()));
+		_titleFont->elided(_title, textWidth));
 	p.setPen(colors.sub);
 	p.setFont(_subtitleFont->f);
 	p.drawText(
-		QRect(cover.x(), S(352), cover.width(), _subtitleFont->height),
+		QRect(cover.x(), S(352), textWidth, _subtitleFont->height),
 		Qt::AlignLeft | Qt::AlignVCenter,
-		_subtitleFont->elided(_performer, cover.width()));
+		_subtitleFont->elided(_performer, textWidth));
+
+	const auto heartCenter = buttonCenter(Button::Heart);
+	const auto saved = isSavedToProfile();
+	if (saved || _over == Button::Heart) {
+		p.setPen(Qt::NoPen);
+		p.setBrush(saved ? colors.tonal : colors.raised);
+		p.drawEllipse(QPointF(heartCenter), S(18), S(18));
+	}
+	PaintHeartIcon(
+		p,
+		heartCenter,
+		S(9),
+		saved ? colors.accent : (_over == Button::Heart) ? colors.fg : colors.sub,
+		saved);
 
 	const auto slider = sliderRect();
 	const auto total = length();
@@ -967,44 +1335,76 @@ void View::paintControlsMd3(QPainter &p) {
 	const auto value = (total > 0)
 		? std::clamp(float64(now) / total, 0., 1.)
 		: 0.;
-	const auto track = slider.height() / 2.;
-	const auto handleWidth = S(4);
-	const auto handleHeight = (_over == Button::Slider || _seeking)
+	const auto cy = slider.y() + slider.height() / 2.0;
+	const auto strokeW = float64(S(4));
+	const auto handleWidth = float64(_seeking ? S(4) : S(5));
+	const auto handleHeight = float64((_over == Button::Slider || _seeking)
 		? S(24)
-		: S(20);
-	const auto gap = S(5);
-	const auto handleX = slider.x()
-		+ int((slider.width() - handleWidth) * value);
+		: S(20));
+	const auto left = float64(slider.x()) + S(2);
+	const auto right = float64(slider.x() + slider.width()) - S(2);
+	const auto handleCenterX = left + (right - left) * value;
+	const auto visualGap = float64(S(4)) + strokeW * 0.35;
+	const auto capHalf = strokeW / 2.0;
+	const auto waveEnd = handleCenterX - handleWidth / 2.0 - visualGap - capHalf;
+	const auto stopX = right - capHalf;
+	const auto restX = std::min(
+		stopX,
+		handleCenterX + handleWidth / 2.0 + visualGap + capHalf);
+
+	if (restX < stopX) {
+		auto trackPen = QPen(colors.tonal, strokeW, Qt::SolidLine, Qt::RoundCap);
+		p.setPen(trackPen);
+		p.setBrush(Qt::NoBrush);
+		p.drawLine(QPointF(restX, cy), QPointF(stopX, cy));
+	}
+	if (waveEnd > left) {
+		auto wavePen = QPen(
+			colors.accent,
+			strokeW,
+			Qt::SolidLine,
+			Qt::RoundCap,
+			Qt::RoundJoin);
+		p.setPen(wavePen);
+		p.setBrush(Qt::NoBrush);
+		if (_waveAmplitude > 0.0 && WavySeekbarEnabled()) {
+			const auto lambda = float64(S(34));
+			const auto step = std::max(1.0, float64(S(2)));
+			auto wavePath = QPainterPath();
+			auto first = true;
+			for (auto px = left; ; px += step) {
+				const auto last = (px >= waveEnd);
+				const auto cx = last ? waveEnd : px;
+				const auto y = cy
+					+ _waveAmplitude * std::sin(kWaveTau * cx / lambda - _wavePhase);
+				if (first) {
+					wavePath.moveTo(cx, y);
+					first = false;
+				} else {
+					wavePath.lineTo(cx, y);
+				}
+				if (last) {
+					break;
+				}
+			}
+			p.drawPath(wavePath);
+		} else {
+			p.drawLine(QPointF(left, cy), QPointF(waveEnd, cy));
+		}
+	}
 	p.setPen(Qt::NoPen);
-	const auto activeRight = handleX - gap;
-	if (activeRight > slider.x()) {
-		p.setBrush(colors.accent);
-		p.drawRoundedRect(
-			QRectF(slider.x(), slider.y(), activeRight - slider.x(), slider.height()),
-			track,
-			track);
-	}
-	const auto inactiveLeft = handleX + handleWidth + gap;
-	if (inactiveLeft < slider.x() + slider.width()) {
-		p.setBrush(colors.tonal);
-		p.drawRoundedRect(
-			QRectF(
-				inactiveLeft,
-				slider.y(),
-				slider.x() + slider.width() - inactiveLeft,
-				slider.height()),
-			track,
-			track);
-	}
 	p.setBrush(colors.accent);
 	p.drawRoundedRect(
 		QRectF(
-			handleX,
-			slider.y() + (slider.height() - handleHeight) / 2.,
+			handleCenterX - handleWidth / 2.0,
+			cy - handleHeight / 2.0,
 			handleWidth,
 			handleHeight),
-		handleWidth / 2.,
-		handleWidth / 2.);
+		handleWidth / 2.0,
+		handleWidth / 2.0);
+	if (stopX > restX + S(1)) {
+		p.drawEllipse(QPointF(stopX, cy), float64(S(2)), float64(S(2)));
+	}
 
 	p.setFont(_timeFont->f);
 	p.setPen(colors.sub);
@@ -1078,6 +1478,10 @@ void View::paintControlsMd3(QPainter &p) {
 			? st::mediaPlayerRepeatOneIcon
 			: st::mediaPlayerRepeatButton.icon,
 		repeat != Media::RepeatMode::None);
+	paintIcon(
+		Button::Playlists,
+		st::menuIconAddToFolder,
+		Extera::Playlists::HasActiveQueue());
 	paintIcon(Button::ShowMessage, st::menuIconShowInChat, false);
 	paintIcon(Button::CopyLyrics, st::menuIconCopy, false);
 
@@ -1120,18 +1524,35 @@ void View::paintControls(QPainter &p) {
 		return;
 	}
 	const auto cover = coverRect();
+	const auto textWidth = cover.width() - S(42);
 	p.setPen(Qt::white);
 	p.setFont(_titleFont->f);
 	p.drawText(
-		QRect(cover.x(), S(328), cover.width(), _titleFont->height),
+		QRect(cover.x(), S(328), textWidth, _titleFont->height),
 		Qt::AlignLeft | Qt::AlignVCenter,
-		_titleFont->elided(_title, cover.width()));
+		_titleFont->elided(_title, textWidth));
 	p.setPen(QColor(255, 255, 255, 170));
 	p.setFont(_subtitleFont->f);
 	p.drawText(
-		QRect(cover.x(), S(356), cover.width(), _subtitleFont->height),
+		QRect(cover.x(), S(356), textWidth, _subtitleFont->height),
 		Qt::AlignLeft | Qt::AlignVCenter,
-		_subtitleFont->elided(_performer, cover.width()));
+		_subtitleFont->elided(_performer, textWidth));
+
+	const auto heartCenter = buttonCenter(Button::Heart);
+	const auto saved = isSavedToProfile();
+	if (saved || _over == Button::Heart) {
+		p.setPen(Qt::NoPen);
+		p.setBrush(QColor(255, 255, 255, saved ? 46 : 24));
+		p.drawEllipse(QPointF(heartCenter), S(18), S(18));
+	}
+	PaintHeartIcon(
+		p,
+		heartCenter,
+		S(9),
+		saved
+			? QColor(255, 107, 129)
+			: QColor(255, 255, 255, (_over == Button::Heart) ? 255 : 185),
+		saved);
 
 	const auto slider = sliderRect();
 	const auto total = length();
@@ -1223,6 +1644,10 @@ void View::paintControls(QPainter &p) {
 			? st::mediaPlayerRepeatOneIcon
 			: st::mediaPlayerRepeatButton.icon,
 		repeat != Media::RepeatMode::None);
+	paintIcon(
+		Button::Playlists,
+		st::menuIconAddToFolder,
+		Extera::Playlists::HasActiveQueue());
 	paintIcon(Button::ShowMessage, st::menuIconShowInChat, false);
 	paintIcon(Button::CopyLyrics, st::menuIconCopy, false);
 
@@ -1309,18 +1734,44 @@ void View::paintLyrics(QPainter &p) {
 } // namespace
 
 void View::contextMenuEvent(QContextMenuEvent *e) {
-	const auto items = Extera::Plugins::PlayerMenuItems();
-	if (items.empty()) {
+	const auto button = buttonAt(e->pos());
+	if (button == Button::Heart) {
+		saveToSavedMessages();
+		return;
+	}
+	if (button == Button::Playlists) {
+		Extera::Playlists::ShowPlaylistsBox(_controller);
 		return;
 	}
 	_pluginMenu = base::make_unique_q<Ui::PopupMenu>(
 		this,
 		st::popupMenuWithIcons);
-	for (const auto &[id, text] : items) {
-		const auto itemId = id;
-		_pluginMenu->addAction(text, [=] {
-			Extera::Plugins::PlayerMenuClick(itemId);
-		});
+	if (_document) {
+		_pluginMenu->addAction(u"Save to Saved Messages"_q, [=] {
+			saveToSavedMessages();
+		}, &st::menuIconForward);
+		_pluginMenu->addAction(u"Add to Playlist"_q, [=] {
+			if (_document) {
+				Extera::Playlists::ShowAddToPlaylistBox(
+					_controller,
+					_document,
+					_context);
+			}
+		}, &st::menuIconAddToFolder);
+	}
+	_pluginMenu->addAction(u"My Playlists"_q, [=] {
+		Extera::Playlists::ShowPlaylistsBox(_controller);
+	}, &st::menuIconFave);
+
+	const auto items = Extera::Plugins::PlayerMenuItems();
+	if (!items.empty()) {
+		_pluginMenu->addSeparator();
+		for (const auto &[id, text] : items) {
+			const auto itemId = id;
+			_pluginMenu->addAction(text, [=] {
+				Extera::Plugins::PlayerMenuClick(itemId);
+			});
+		}
 	}
 	_pluginMenu->popup(e->globalPos());
 }

@@ -44,6 +44,11 @@
 #include "lang/lang_keys.h"
 #include "extera/exd_settings_sync.h"
 #include "extera/exd_update_box.h"
+#include "extera/molten_avatar_shapes.h"
+#include "extera/molten_bot_sync.h"
+#include "extera/molten_custom_commands.h"
+#include "extera/molten_playlists.h"
+#include "extera/molten_profile_metadata.h"
 #include "base/unixtime.h"
 #include "main/main_session.h"
 #include "main/main_session_settings.h"
@@ -1104,13 +1109,6 @@ void ShowAppIconBox(not_null<Window::SessionController*> controller) {
 		box->addTopButton(st::boxTitleClose, [=] { box->closeBox(); });
 		const auto variants = Extera::AppIcon::Variants();
 		const auto count = int(variants.size());
-		const auto titles = std::vector<QString>{
-			tr::lng_extera_app_icon_default(tr::now),
-			tr::lng_exd_app_icon_telegram(tr::now),
-			tr::lng_exd_app_icon_accent(tr::now),
-			tr::lng_exd_app_icon_dark(tr::now),
-			tr::lng_exd_app_icon_light(tr::now),
-		};
 		const auto currentId = Extera::String(u"app_icon"_q);
 		const auto currentSquare = Extera::Bool(u"app_icon_square"_q);
 		const auto current = [&] {
@@ -1184,7 +1182,7 @@ void ShowAppIconBox(not_null<Window::SessionController*> controller) {
 						st::exteraAppIconCaptionFont->height),
 					Qt::AlignHCenter | Qt::AlignTop,
 					st::exteraAppIconCaptionFont->elided(
-						titles[i],
+						variants[i].title,
 						cell - 4));
 			}
 		}, grid->lifetime());
@@ -1878,6 +1876,78 @@ void PartGeneral7(SectionBuilder &builder) {
 			{ u"screenshot"_q, u"capture"_q });
 	});
 	AddAbout(builder, tr::lng_exd_capture_protection_about());
+
+	builder.addSkip();
+	builder.addSubsectionTitle(rpl::single(u"MoltenGram"_q));
+	builder.card([&] {
+		builder.addButton({
+			.id = u"extera/molten_profile_styling"_q,
+			.title = rpl::single(u"Profile Styling & Free Emoji Status"_q),
+			.st = &st::settingsButtonNoIcon,
+			.onClick = [=] {
+				Extera::MoltenBotSync::ShowProfileStylingBox(controller);
+			},
+			.keywords = { u"molten"_q, u"profile"_q, u"emoji"_q, u"status"_q, u"bot"_q },
+		});
+		AddToggle(
+			builder,
+			u"molten_custom_emoji_status"_q,
+			rpl::single(u"Free Custom Emoji Status"_q),
+			{ u"molten"_q, u"emoji"_q, u"status"_q });
+		AddToggle(
+			builder,
+			u"molten_free_profile_appearance"_q,
+			rpl::single(u"Free Profile Appearance"_q),
+			{ u"molten"_q, u"profile"_q, u"color"_q });
+		if (const auto botSync = builder.addButton({
+				.id = u"extera/molten_bot_profile_sync"_q,
+				.title = rpl::single(u"Companion Bot Profile Sync"_q),
+				.st = &st::settingsButtonNoIcon,
+				.toggled = rpl::single(Extera::Bool(u"molten_bot_profile_sync"_q)),
+				.keywords = { u"molten"_q, u"bot"_q, u"sync"_q },
+			})) {
+			botSync->toggledValue(
+			) | rpl::filter([=](bool value) {
+				return (value != Extera::Bool(u"molten_bot_profile_sync"_q));
+			}) | rpl::on_next([=](bool value) {
+				Config().setBool(u"molten_bot_profile_sync"_q, value);
+				Extera::MoltenProfile::ResyncSelfMetadata(&controller->session());
+			}, botSync->lifetime());
+		}
+		AddToggle(
+			builder,
+			u"molten_clean_bio_display"_q,
+			rpl::single(u"Hide Invisible Profile Tags"_q),
+			{ u"molten"_q, u"bio"_q, u"tags"_q });
+		builder.addButton({
+			.id = u"extera/molten_playlists"_q,
+			.title = rpl::single(u"My Local Playlists"_q),
+			.st = &st::settingsButtonNoIcon,
+			.onClick = [=] {
+				Extera::Playlists::ShowPlaylistsBox(controller);
+			},
+			.keywords = { u"molten"_q, u"playlist"_q, u"music"_q, u"audio"_q },
+		});
+		builder.addButton({
+			.id = u"extera/molten_custom_commands"_q,
+			.title = rpl::single(u"Custom Autocomplete Commands"_q),
+			.st = &st::settingsButtonNoIcon,
+			.onClick = [=] {
+				Extera::MoltenCommands::ShowSettingsBox(controller);
+			},
+			.keywords = { u"molten"_q, u"commands"_q, u"autocomplete"_q },
+		});
+		AddToggle(
+			builder,
+			u"custom_commands_enabled"_q,
+			rpl::single(u"Enable Custom Commands"_q),
+			{ u"molten"_q, u"commands"_q });
+		AddToggle(
+			builder,
+			u"strip_tracking_on_open"_q,
+			rpl::single(u"Strip URL Tracking Parameters"_q),
+			{ u"molten"_q, u"url"_q, u"tracking"_q, u"utm"_q, u"privacy"_q });
+	});
 }
 
 void PartAppearance0(SectionBuilder &builder) {
@@ -2043,6 +2113,54 @@ void PartAppearance4(SectionBuilder &builder) {
 			{ u"music"_q, u"profile"_q, u"player"_q });
 	});
 	AddAbout(builder, tr::lng_extera_custom_themes_about());
+
+	builder.addSkip();
+	builder.addSubsectionTitle(rpl::single(u"MoltenGram Visuals & Player"_q));
+	builder.card([&] {
+		builder.addButton({
+			.id = u"extera/molten_avatar_shapes"_q,
+			.title = rpl::single(u"MD3 Expressive Avatar Shapes"_q),
+			.st = &st::settingsButtonNoIcon,
+			.onClick = [=] {
+				Extera::AvatarShapes::ShowSettingsBox(controller);
+			},
+			.keywords = { u"molten"_q, u"avatar"_q, u"shape"_q, u"md3"_q },
+		});
+		AddToggle(
+			builder,
+			u"md3_media_carousel"_q,
+			rpl::single(u"MD3 Media Carousel for Albums"_q),
+			{ u"molten"_q, u"carousel"_q, u"album"_q, u"media"_q });
+		builder.addButton({
+			.id = u"extera/molten_glass_bubbles"_q,
+			.title = rpl::single(u"Frosted / Liquid Glass Bubbles"_q),
+			.st = &st::settingsButtonNoIcon,
+			.onClick = [=] {
+				Extera::GlassBubbles::ShowSettingsBox(controller);
+			},
+			.keywords = { u"molten"_q, u"glass"_q, u"bubble"_q, u"frosted"_q },
+		});
+		AddToggle(
+			builder,
+			u"glass_messages"_q,
+			rpl::single(u"Glass Message Bubbles"_q),
+			{ u"molten"_q, u"glass"_q, u"messages"_q });
+		AddToggle(
+			builder,
+			u"player_wavy_seekbar"_q,
+			rpl::single(u"Wavy MD3 Player Seekbar"_q),
+			{ u"molten"_q, u"player"_q, u"wavy"_q, u"seekbar"_q });
+		AddToggle(
+			builder,
+			u"player_online_cover"_q,
+			rpl::single(u"Fetch Online Cover Art"_q),
+			{ u"molten"_q, u"player"_q, u"cover"_q, u"music"_q });
+		AddToggle(
+			builder,
+			u"colored_text"_q,
+			rpl::single(u"Colored Text (tg://color)"_q),
+			{ u"molten"_q, u"color"_q, u"text"_q });
+	});
 }
 
 void PartChats0(SectionBuilder &builder) {

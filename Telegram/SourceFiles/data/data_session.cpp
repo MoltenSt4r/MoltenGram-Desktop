@@ -8,6 +8,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "data/data_session.h"
 
 #include "extera/extera_config.h"
+#include "extera/molten_profile_metadata.h"
 
 #include <QtCore/QFile>
 
@@ -949,6 +950,12 @@ not_null<UserData*> Session::processUser(const MTPUser &data) {
 		if (result->changeColorProfile(data.vprofile_color())) {
 			flags |= UpdateFlag::ColorProfile;
 		}
+		Extera::MoltenProfile::ApplyMetadata(
+			result,
+			data.vemoji_status().has_value(),
+			data.vcolor().has_value(),
+			data.vprofile_color().has_value(),
+			true);
 	});
 
 	if (minimal) {

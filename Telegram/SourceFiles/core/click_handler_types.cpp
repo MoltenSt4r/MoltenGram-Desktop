@@ -7,6 +7,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "core/click_handler_types.h"
 
+#include "extera/molten_url_cleaner.h"
+
 #include "base/unixtime.h"
 #include "lang/lang_keys.h"
 #include "chat_helpers/bot_command.h"
@@ -514,6 +516,12 @@ void HiddenUrlClickHandler::Open(QString url, QVariant context) {
 		return;
 	}
 
+	if (Extera::ColoredText::IsColorUrl(url)) {
+		const auto my = context.value<ClickHandlerContext>();
+		Extera::ColoredText::HandleColorUrlClick(url, my.show);
+		return;
+	}
+
 	if (url.startsWith(u"tg://"_q, Qt::CaseInsensitive)
 		|| url.startsWith(u"internal:"_q, Qt::CaseInsensitive)) {
 		UrlClickHandler::Open(url, QVariant::fromValue([&] {
@@ -524,6 +532,9 @@ void HiddenUrlClickHandler::Open(QString url, QVariant context) {
 	} else {
 		auto my = context.value<ClickHandlerContext>();
 		const auto isEmail = UrlClickHandler::IsEmail(url);
+		if (!isEmail) {
+			url = Extera::UrlCleaner::CleanIfEnabled(url);
+		}
 		const auto external = QUrl(url);
 		const auto parsedUrl = external.scheme().isEmpty()
 			? QUrl::fromUserInput(url)

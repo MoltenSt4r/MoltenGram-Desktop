@@ -7,9 +7,12 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "ui/userpic_view.h"
 
+#include "extera/molten_avatar_shapes.h"
 #include "ui/empty_userpic.h"
 #include "ui/painter.h"
 #include "ui/image/image_prepare.h"
+
+#include <QtGui/QPainterPath>
 
 #include <cmath>
 
@@ -34,7 +37,29 @@ int Corners = kMaxCorners;
 bool SingleRadius = false;
 
 [[nodiscard]] uint8 CornersKey() {
+	const auto md3Shape = Extera::AvatarShapes::ActiveShapeId();
+	if (md3Shape > 0) {
+		return uint8(0x40 | (md3Shape & 0x3F)) | (SingleRadius ? 0x80 : 0);
+	}
 	return uint8(Corners) | (SingleRadius ? 0x80 : 0);
+}
+
+[[nodiscard]] QImage ApplyMd3ShapeMask(QImage &&image, int shapeId) {
+	if (image.isNull() || shapeId <= 0) {
+		return std::move(image);
+	}
+	const auto size = image.size();
+	auto result = QImage(size, QImage::Format_ARGB32_Premultiplied);
+	result.setDevicePixelRatio(image.devicePixelRatio());
+	result.fill(Qt::transparent);
+	auto p = QPainter(&result);
+	auto hq = PainterHighQualityEnabler(p);
+	p.setClipPath(Extera::AvatarShapes::ShapePath(
+		shapeId,
+		QRectF(0., 0., size.width(), size.height())));
+	p.drawImage(0, 0, image);
+	p.end();
+	return result;
 }
 
 } // namespace
@@ -49,7 +74,10 @@ int UserpicCorners() {
 }
 
 void DrawUserpicShape(QPainter &p, QRectF rect) {
-	if (Corners >= kMaxCorners) {
+	const auto md3Shape = Extera::AvatarShapes::ActiveShapeId();
+	if (md3Shape > 0) {
+		p.drawPath(Extera::AvatarShapes::ShapePath(md3Shape, rect));
+	} else if (Corners >= kMaxCorners) {
 		p.drawEllipse(rect);
 	} else {
 		const auto radius = rect.width() * Corners / (2. * kMaxCorners);
@@ -180,7 +208,13 @@ void ValidateUserpicCache(
 	view.empty = empty;
 	view.shape = shapeValue;
 	view.corners = CornersKey();
-	const auto custom = (Corners < kMaxCorners)
+	const auto md3Shape = Extera::AvatarShapes::ActiveShapeId();
+	const auto useMd3Shape = (md3Shape > 0)
+		&& ((shape == PeerUserpicShape::Auto)
+			|| (shape == PeerUserpicShape::Circle)
+			|| (SingleRadius && shape == PeerUserpicShape::Forum));
+	const auto custom = !useMd3Shape
+		&& (Corners < kMaxCorners)
 		&& ((shape == PeerUserpicShape::Auto)
 			|| (shape == PeerUserpicShape::Circle)
 			|| (SingleRadius && shape == PeerUserpicShape::Forum));
@@ -192,7 +226,9 @@ void ValidateUserpicCache(
 			full,
 			Qt::IgnoreAspectRatio,
 			Qt::SmoothTransformation);
-		if (custom) {
+		if (useMd3Shape) {
+			view.cached = ApplyMd3ShapeMask(std::move(view.cached), md3Shape);
+		} else if (custom) {
 			if (Corners > 0) {
 				view.cached = Images::Round(
 					std::move(view.cached),
@@ -216,7 +252,13 @@ void ValidateUserpicCache(
 		view.cached.fill(Qt::transparent);
 
 		auto p = QPainter(&view.cached);
-		if (custom && Corners > 0) {
+		if (useMd3Shape) {
+			auto hq = PainterHighQualityEnabler(p);
+			p.setClipPath(Extera::AvatarShapes::ShapePath(
+				md3Shape,
+				QRectF(0., 0., size, size)));
+			empty->paintSquare(p, 0, 0, size, size);
+		} else if (custom && Corners > 0) {
 			empty->paintRounded(p, 0, 0, size, size, int(radius));
 		} else if (custom) {
 			empty->paintSquare(p, 0, 0, size, size);

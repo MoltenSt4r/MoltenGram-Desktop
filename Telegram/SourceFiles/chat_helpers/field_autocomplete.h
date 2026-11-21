@@ -88,6 +88,7 @@ public:
 		not_null<UserData*> user;
 		QString command;
 		ChooseMethod method = ChooseMethod::ByEnter;
+		bool isCustom = false;
 	};
 	using StickerChosen = FileChosen;
 	enum class Type {
@@ -186,6 +187,7 @@ private:
 	uint64 _stickersSeed = 0;
 	Type _type = Type::Mentions;
 	QString _filter;
+	QString _customPrefix;
 	QString _exdSearchQuery;
 	std::vector<not_null<UserData*>> _exdSearchUsers;
 	mtpRequestId _exdSearchRequestId = 0;

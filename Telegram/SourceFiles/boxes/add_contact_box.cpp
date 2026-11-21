@@ -37,6 +37,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "data/data_user.h"
 #include "data/data_session.h"
 #include "data/data_changes.h"
+#include "extera/molten_profile_metadata.h"
 #include "apiwrap.h"
 #include "api/api_invite_links.h"
 #include "api/api_peer_photo.h"
@@ -1681,6 +1682,10 @@ void EditNameBox::save() {
 		first = last;
 		last = QString();
 	}
+	std::tie(first, last) = Extera::MoltenProfile::PackProfileNamesForEdit(
+		_user,
+		first,
+		last);
 	_sentName = first;
 	auto flags = MTPaccount_UpdateProfile::Flag::f_first_name
 		| MTPaccount_UpdateProfile::Flag::f_last_name;
