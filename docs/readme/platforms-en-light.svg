@@ -1,0 +1,49 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="840" height="376" viewBox="0 0 840 376" role="img" aria-label="Platforms &amp; Architecture">
+<title>Platforms &amp; Architecture</title>
+<style>text{font-family:'Google Sans','Segoe UI',-apple-system,BlinkMacSystemFont,Roboto,'Noto Sans',Arial,sans-serif}
+.up{animation:up .75s cubic-bezier(.05,.7,.1,1) both}
+.pop{transform-box:fill-box;transform-origin:center;animation:pop .55s cubic-bezier(.34,1.56,.64,1) both}
+.fade{animation:fade .8s ease both}
+.spin{transform-box:fill-box;transform-origin:center;animation:spin 42s linear infinite}
+.spin-r{transform-box:fill-box;transform-origin:center;animation:spin 30s linear infinite reverse}
+.bob{transform-box:fill-box;transform-origin:center;animation:bob 7s ease-in-out infinite}
+.wave{animation:wave 2.6s linear infinite}
+@keyframes up{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
+@keyframes pop{from{opacity:0;transform:scale(.75)}to{opacity:1;transform:scale(1)}}
+@keyframes fade{from{opacity:0}to{opacity:1}}
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes bob{0%,100%{transform:translateY(0) rotate(0)}50%{transform:translateY(-9px) rotate(10deg)}}
+@keyframes wave{from{transform:translateX(0)}to{transform:translateX(-48px)}}
+@media (prefers-reduced-motion:reduce){*{animation:none!important}}</style>
+<rect width="840" height="376" rx="32" fill="#FFF8F6"/>
+<path class="pop" d="M70.0 44.0 L69.2 45.5 L67.3 46.7 L65.1 47.6 L63.6 48.5 L63.2 49.5 L64.0 51.1 L65.2 53.2 L66.1 55.3 L65.8 56.9 L64.3 57.7 L62.0 57.6 L59.7 57.0 L58.0 56.8 L57.0 57.4 L56.8 59.2 L56.6 61.5 L56.0 63.7 L54.8 64.9 L53.2 64.7 L51.4 63.2 L49.8 61.4 L48.6 60.2 L47.4 60.2 L46.2 61.4 L44.6 63.2 L42.8 64.7 L41.2 64.9 L40.0 63.7 L39.4 61.5 L39.2 59.2 L39.0 57.4 L38.0 56.8 L36.3 57.0 L34.0 57.6 L31.7 57.7 L30.2 56.9 L29.9 55.3 L30.8 53.2 L32.0 51.1 L32.8 49.5 L32.4 48.5 L30.9 47.6 L28.7 46.7 L26.8 45.5 L26.0 44.0 L26.8 42.5 L28.7 41.3 L30.9 40.4 L32.4 39.5 L32.8 38.5 L32.0 36.9 L30.8 34.8 L29.9 32.7 L30.2 31.1 L31.7 30.3 L34.0 30.4 L36.3 31.0 L38.0 31.2 L39.0 30.6 L39.2 28.8 L39.4 26.5 L40.0 24.3 L41.2 23.1 L42.8 23.3 L44.6 24.8 L46.2 26.6 L47.4 27.8 L48.6 27.8 L49.8 26.6 L51.4 24.8 L53.2 23.3 L54.8 23.1 L56.0 24.3 L56.6 26.5 L56.8 28.8 L57.0 30.6 L58.0 31.2 L59.7 31.0 L62.0 30.4 L64.3 30.3 L65.8 31.1 L66.1 32.7 L65.2 34.8 L64.0 36.9 L63.2 38.5 L63.6 39.5 L65.1 40.4 L67.3 41.3 L69.2 42.5 Z" fill="#FFDAD3"/>
+<g transform="translate(38,34) scale(0.83)"><path d="M4 6h18V4H4c-1.1 0-2 .9-2 2v11H0v3h14v-3H4V6zm19 2h-6c-.55 0-1 .45-1 1v10c0 .55.45 1 1 1h6c.55 0 1-.45 1-1V9c0-.55-.45-1-1-1zm-1 9h-4v-7h4v7z" fill="#EE6B54"/></g>
+<text x="80" y="51" fill="#231917" font-size="22" font-weight="800">Platforms &amp; Architecture</text>
+<rect x="668" y="27" width="144" height="34" rx="17" fill="#FFDAD3"/>
+<text x="740" y="49" fill="#8E2918" font-size="13" font-weight="700" text-anchor="middle">Qt 6 · C++20</text>
+<g class="up" style="animation-delay:0.05s">
+  <rect x="28" y="84" width="784" height="58" rx="18" fill="#FCEBE7"/>
+  <rect x="42" y="99" width="112" height="28" rx="14" fill="#FFDAD3"/>
+  <text x="98" y="117" fill="#3F0B03" font-size="11.5" font-weight="700" text-anchor="middle">WINDOWS</text>
+  <text x="170" y="109" fill="#231917" font-size="15.5" font-weight="700">x64 Installer &amp; Portable Archive</text>
+  <text x="170" y="128" fill="#5A4440" font-size="12.5" font-weight="400">MoltenGram-Desktop-setup-x64.*.exe  •  portable-x64.*.zip  •  built-in tg-ws-proxy</text>
+</g><g class="up" style="animation-delay:0.10s">
+  <rect x="28" y="152" width="784" height="58" rx="18" fill="#FCEBE7"/>
+  <rect x="42" y="167" width="112" height="28" rx="14" fill="#FFDAD3"/>
+  <text x="98" y="185" fill="#3F0B03" font-size="11.5" font-weight="700" text-anchor="middle">LINUX</text>
+  <text x="170" y="177" fill="#231917" font-size="15.5" font-weight="700">x64 Tarball &amp; One-Line install.sh</text>
+  <text x="170" y="196" fill="#5A4440" font-size="12.5" font-weight="400">MoltenGram-Desktop-linux-x64.*.tar.gz  •  Qt 6 (Wayland / X11)  •  Python 3.11–3.14</text>
+</g><g class="up" style="animation-delay:0.15s">
+  <rect x="28" y="220" width="784" height="58" rx="18" fill="#FCEBE7"/>
+  <rect x="42" y="235" width="112" height="28" rx="14" fill="#FFDAD3"/>
+  <text x="98" y="253" fill="#3F0B03" font-size="11.5" font-weight="700" text-anchor="middle">MACOS</text>
+  <text x="170" y="245" fill="#231917" font-size="15.5" font-weight="700">Native Apple Silicon Build (arm64)</text>
+  <text x="170" y="264" fill="#5A4440" font-size="12.5" font-weight="400">MoltenGram-Desktop-macos-arm64.*.dmg / .zip  •  install.sh supported</text>
+</g><g class="up" style="animation-delay:0.20s">
+  <rect x="28" y="288" width="784" height="58" rx="18" fill="#FCEBE7"/>
+  <rect x="42" y="303" width="112" height="28" rx="14" fill="#FFDAD3"/>
+  <text x="98" y="321" fill="#3F0B03" font-size="11.5" font-weight="700" text-anchor="middle">STACK</text>
+  <text x="170" y="313" fill="#231917" font-size="15.5" font-weight="700">Telegram Desktop + exDesktop · CMake + Ninja</text>
+  <text x="170" y="332" fill="#5A4440" font-size="12.5" font-weight="400">Cross-platform C++20, .plugin/.elyx/.eaf sandbox &amp; PluginGuard AI security model</text>
+</g>
+</svg>

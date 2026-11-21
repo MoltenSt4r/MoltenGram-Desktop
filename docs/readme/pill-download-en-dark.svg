@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="192" height="42" viewBox="0 0 192 42" role="img" aria-label="Download Release">
+<title>Download Release</title>
+<style>text{font-family:'Google Sans','Segoe UI',-apple-system,BlinkMacSystemFont,Roboto,'Noto Sans',Arial,sans-serif}</style>
+<rect x="0.75" y="0.75" width="190.50" height="40.50" rx="21.0" fill="#EE6B54" stroke="none"/>
+<g transform="translate(16,12.0) scale(0.75)"><path d="M12 15.5l-4.5-4.5 1.4-1.4 2.1 2.1V4h2v7.7l2.1-2.1 1.4 1.4L12 15.5zM5 19v-3h2v1h10v-1h2v3H5z" fill="#FFFFFF"/></g>
+<text x="110.0" y="26.0" fill="#FFFFFF" font-size="14" font-weight="700" text-anchor="middle">Download Release</text>
+</svg>

@@ -1,34 +1,185 @@
+<div align="center">
+
+<!-- Language Switcher Pills -->
 <p align="center">
-  <a href="https://github.com/MoltenSt4r/MoltenGram-Desktop/stargazers"><img src="docs/banner.png" alt="Star MoltenGram Desktop on GitHub" width="100%"></a>
+  <a href="README.md">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="docs/readme/lang-ru-inactive-dark.svg">
+      <img src="docs/readme/lang-ru-inactive-light.svg" height="34" alt="Открыть на русском">
+    </picture>
+  </a>
+  &nbsp;
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/readme/lang-en-active-dark.svg">
+    <img src="docs/readme/lang-en-active-light.svg" height="34" alt="English (selected)">
+  </picture>
+</p>
+
+<!-- Hero Header Card -->
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/readme/hero-en-dark.svg">
+  <img src="docs/readme/hero-en-light.svg" width="100%" alt="MoltenGram Desktop — Material 3 Expressive Telegram Client">
+</picture>
+
+<br>
+
+<!-- Rounded Material 3 Pill Action Strip -->
+<p align="center">
+  <a href="https://github.com/MoltenSt4r/MoltenGram-Desktop/releases/latest">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="docs/readme/pill-download-en-dark.svg">
+      <img src="docs/readme/pill-download-en-light.svg" height="42" alt="Download Release">
+    </picture>
+  </a>
+  &nbsp;
+  <a href="https://t.me/MoltenGram">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="docs/readme/pill-channel-dark.svg">
+      <img src="docs/readme/pill-channel-light.svg" height="42" alt="Telegram Channel @MoltenGram">
+    </picture>
+  </a>
+  &nbsp;
+  <a href="https://t.me/MoltenGramBot">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="docs/readme/pill-chat-dark.svg">
+      <img src="docs/readme/pill-chat-light.svg" height="42" alt="Support & Chat @MoltenGramBot">
+    </picture>
+  </a>
+  &nbsp;
+  <a href="https://www.moltenstar.space">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="docs/readme/pill-website-dark.svg">
+      <img src="docs/readme/pill-website-light.svg" height="42" alt="Official Website moltenstar.space">
+    </picture>
+  </a>
+  &nbsp;
+  <a href="LICENSE">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="docs/readme/pill-license-dark.svg">
+      <img src="docs/readme/pill-license-light.svg" height="42" alt="GPL-3.0 License">
+    </picture>
+  </a>
+</p>
+
+<!-- Live Release & Downloads Badges -->
+<p align="center">
+  <a href="https://github.com/MoltenSt4r/MoltenGram-Desktop/releases/latest"><img src="https://img.shields.io/github/v/release/MoltenSt4r/MoltenGram-Desktop?label=Release&color=ee6b54&style=flat-square" alt="Release"></a>
+  <a href="https://github.com/MoltenSt4r/MoltenGram-Desktop/releases"><img src="https://img.shields.io/github/downloads/MoltenSt4r/MoltenGram-Desktop/total?label=Downloads&color=ee6b54&style=flat-square" alt="Downloads"></a>
+  <a href="https://github.com/MoltenSt4r/MoltenGram-Desktop/stargazers"><img src="https://img.shields.io/github/stars/MoltenSt4r/MoltenGram-Desktop?label=Stars&color=ee6b54&style=flat-square" alt="Stars"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-GPL--3.0-ee6b54?style=flat-square" alt="License"></a>
 </p>
 
 <p align="center">
-  <img src="docs/logo.png" width="120" alt="MoltenGram Desktop">
-</p>
-
-<h1 align="center">MoltenGram Desktop</h1>
-
-<p align="center">
-  Modified cross-platform client for Windows, Linux and macOS built from the
+  Modified cross-platform Telegram client for <b>Windows</b>, <b>Linux</b>, and <b>macOS</b> built from
   <a href="https://github.com/telegramdesktop/tdesktop">Telegram Desktop</a> and
-  <a href="https://github.com/metawka/exDesktop">exDesktop</a> sources.<br>
-  Material Design Expressive, deep customization, privacy features, appearance settings, Streamer Mode, and features of exteraGram, AyuGram and other community clients, adapted for Desktop.
+  <a href="https://github.com/metawka/exDesktop">exDesktop</a>.<br>
+  Signature <b>Material Design 3 Expressive</b> aesthetics, the full MoltenGram feature suite (Wave 1 &amp; Wave 2), deep privacy controls, sandboxed plugins, and Streamer Mode.
 </p>
 
-<p align="center">
-  <a href="https://github.com/MoltenSt4r/MoltenGram-Desktop/releases/latest"><img src="https://img.shields.io/github/v/release/MoltenSt4r/MoltenGram-Desktop?label=Release&color=ee6b54" alt="Release"></a>
-  <a href="https://github.com/MoltenSt4r/MoltenGram-Desktop/releases"><img src="https://img.shields.io/github/downloads/MoltenSt4r/MoltenGram-Desktop/total?label=Downloads&color=ee6b54" alt="Downloads"></a>
-  <a href="LICENSE"><img src="https://img.shields.io/badge/License-GPL--3.0-ee6b54" alt="License"></a>
-  <br>
-  <a href="https://t.me/MoltenGram"><img src="https://img.shields.io/badge/Channel-@MoltenGram-2aabee?logo=telegram&logoColor=white" alt="Channel"></a>
-  <a href="https://t.me/MoltenGramBot"><img src="https://img.shields.io/badge/Support-@MoltenGramBot-2aabee?logo=telegram&logoColor=white" alt="Support"></a>
-  <a href="https://www.moltenstar.space"><img src="https://img.shields.io/badge/Website-moltenstar.space-2aabee" alt="Website"></a>
-</p>
+<br>
 
-<p align="center">
-  <img src="https://img.shields.io/badge/English-selected-555?style=for-the-badge" alt="English">
-  <a href="README.md"><img src="https://img.shields.io/badge/Русский-открыть-ee6b54?style=for-the-badge" alt="Русский"></a>
-</p>
+<!-- Wave 1 & Wave 2 MD3 Expressive Feature Card -->
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/readme/features-wave-en-dark.svg">
+  <img src="docs/readme/features-wave-en-light.svg" width="100%" alt="MoltenGram Desktop Features — Wave 1 and Wave 2">
+</picture>
+
+<br>
+
+<!-- Platforms & Architecture Card -->
+<a href="https://github.com/MoltenSt4r/MoltenGram-Desktop/releases/latest">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/readme/platforms-en-dark.svg">
+    <img src="docs/readme/platforms-en-light.svg" width="100%" alt="MoltenGram Desktop Platforms and Architecture">
+  </picture>
+</a>
+
+</div>
+
+---
+
+## Install MoltenGram Desktop
+
+### One-Line Install on Linux / macOS
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/MoltenSt4r/MoltenGram-Desktop/main/install.sh | sh
+```
+
+### Platform Downloads
+
+| Platform | Release Files | Notes |
+|:--|:--|:--|
+| **Windows (x64)** | `MoltenGram-Desktop-setup-x64.*.exe`<br>`MoltenGram-Desktop-portable-x64.*.zip` | Installer or portable archive, built-in `tg-ws-proxy` |
+| **Linux (x64)** | `MoltenGram-Desktop-linux-x64.*.tar.gz` | Extract and run `MoltenGram-Desktop` (or use `install.sh`) |
+| **macOS (Apple Silicon)** | `MoltenGram-Desktop-macos-arm64.*.dmg`<br>`MoltenGram-Desktop-macos-arm64.*.zip` | Native Apple Silicon (arm64) build, `install.sh` supported |
+
+All binaries and checksums are available on the [releases page](https://github.com/MoltenSt4r/MoltenGram-Desktop/releases/latest).
+
+---
+
+## Complete Feature Overview
+
+<details>
+<summary><b>✨ Explore all categories (Visuals, Messages, Audio, Privacy, Network, Plugins)</b></summary>
+
+<table>
+  <tr>
+    <td width="50%" valign="top">
+      <h3>Appearance &amp; Material 3 Expressive</h3>
+      <ul>
+        <li>Material Design 3 Expressive &amp; Smooth Scrolling</li>
+        <li>44 MD3 avatar shapes &amp; 27-icon custom app icon pack</li>
+        <li>Frosted Glass message bubbles</li>
+        <li>MD3 media carousel &amp; expressive MD3 QR generator</li>
+        <li>Bot-based profile styling &amp; PillStack profile badges</li>
+        <li>Deep customization &amp; hiding of Telegram Desktop UI elements</li>
+      </ul>
+    </td>
+    <td width="50%" valign="top">
+      <h3>Messages, Input &amp; Media</h3>
+      <ul>
+        <li>Voice Changer with real-time presets while recording</li>
+        <li>SongRec — instant music recognition via Shazam / AudD</li>
+        <li>NowPlaying live track status (Last.fm integration)</li>
+        <li>Local playlists inside the full-screen audio player</li>
+        <li>Colored text, custom autocomplete commands &amp; smart URL cleaner</li>
+        <li>Configurable Double-Tap actions, QuoteReply &amp; saved deleted quotes</li>
+        <li>Input field calculator, character counter, video notes &amp; formatting-preserving translation</li>
+      </ul>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top">
+      <h3>Privacy &amp; Control</h3>
+      <ul>
+        <li>AyuGram features: ghost mode, saving deleted messages &amp; edit history</li>
+        <li>MTProto Device Spoofing (custom model / OS fingerprint)</li>
+        <li>Deeply configurable Streamer Mode</li>
+        <li>No account limit &amp; removal of Telegram restrictions</li>
+        <li>Hide phone number, show user IDs, registration dates &amp; hidden group members</li>
+      </ul>
+    </td>
+    <td width="50%" valign="top">
+      <h3>Network, Plugins &amp; AI</h3>
+      <ul>
+        <li>Built-in <code>tg-ws-proxy</code> (Windows) &amp; faster downloads/uploads</li>
+        <li>Compatible plugin engine for <code>.plugin</code> / <code>.elyx</code> / <code>.eaf</code> formats</li>
+        <li>Local sandbox &amp; global plugin permission controls</li>
+        <li>PluginGuard vector security model &amp; malicious plugin blocker</li>
+        <li>Built-in AI plugin porting assistant &amp; AI Chat [beta]</li>
+        <li>Local Telegram Premium, custom notifications &amp; automatic updates</li>
+      </ul>
+    </td>
+  </tr>
+</table>
+
+</details>
+
+<details>
+<summary><b>🖼️ Interface Screenshots</b></summary>
+
+<br>
 
 <table>
   <tr>
@@ -53,107 +204,16 @@
   </tr>
 </table>
 
+</details>
 
-## Features
+---
 
-<table>
-  <tr>
-    <td width="50%" valign="top">
-      <h3>Appearance</h3>
-      <ul>
-        <li>Material Design Expressive</li>
-        <li>Smooth Scrolling</li>
-        <li>Custom interface icons</li>
-        <li>Deep customization of interface elements</li>
-        <li>Hiding Telegram Desktop interface elements</li>
-      </ul>
-    </td>
-    <td width="50%" valign="top">
-      <h3>Messages</h3>
-      <ul>
-        <li>Quick actions panel</li>
-        <li>Message sending settings</li>
-        <li>Built-in QuoteReply</li>
-        <li>Scheduled sending for the maximum period for channel editors</li>
-        <li>Forwarding messages from other accounts</li>
-        <li>Message appearance settings</li>
-        <li>Message translation with formatting preserved</li>
-      </ul>
-    </td>
-  </tr>
-  <tr>
-    <td width="50%" valign="top">
-      <h3>Input and media</h3>
-      <ul>
-        <li>Calculations in the input field</li>
-        <li>Character counter</li>
-        <li>Favorite emoji</li>
-        <li>Local premium emoji and Telegram Premium features</li>
-        <li>Creating video messages from video files</li>
-      </ul>
-    </td>
-    <td width="50%" valign="top">
-      <h3>Privacy</h3>
-      <ul>
-        <li>AyuGram features: ghost mode, saving deleted messages and edit history</li>
-        <li>No limit on the number of accounts</li>
-        <li>Removal of Telegram restrictions</li>
-        <li>Hiding the phone number</li>
-        <li>Showing user IDs</li>
-        <li>Showing registration date</li>
-        <li>Deeply configurable Streamer Mode</li>
-        <li>Showing hidden group members</li>
-      </ul>
-    </td>
-  </tr>
-  <tr>
-    <td width="50%" valign="top">
-      <h3>Network and notifications</h3>
-      <ul>
-        <li>Built-in tg-ws-proxy on Windows</li>
-        <li>Faster downloads and uploads</li>
-        <li>Notification appearance settings</li>
-        <li>Custom notification sound</li>
-        <li>Local Telegram Premium</li>
-        <li>Automatic updates</li>
-      </ul>
-    </td>
-    <td width="50%" valign="top">
-      <h3>Plugins and AI</h3>
-      <ul>
-        <li>Compatible plugin engine for .plugin / .elyx / .eaf formats (in progress)</li>
-        <li>Built-in AI assistant for porting plugins</li>
-        <li>Local sandbox protecting against malicious plugins</li>
-        <li>Global plugin permission settings</li>
-        <li>PluginGuard, a powerful vector model for plugin security checks</li>
-        <li>Built-in blocker for installing malicious plugins</li>
-        <li>AI Chat [beta]</li>
-      </ul>
-    </td>
-  </tr>
-</table>
-
-## Install MoltenGram Desktop
-
-| System | File |
-|:--|:--|
-| Windows | installer `MoltenGram-Desktop-setup-x64.*.exe` or portable `MoltenGram-Desktop-portable-x64.*.zip` |
-| Linux (alternative) | `MoltenGram-Desktop-linux-x64.*.tar.gz`, run the `MoltenGram-Desktop` file from the archive |
-| macOS (alternative) | `MoltenGram-Desktop-macos-arm64.*.dmg` or `.zip` for Apple Silicon |
-
-## Install on Linux / macOS
-```bash
-curl -fsSL https://raw.githubusercontent.com/MoltenSt4r/MoltenGram-Desktop/main/install.sh | sh
-```
-All files are available on the [releases page](https://github.com/MoltenSt4r/MoltenGram-Desktop/releases/latest).
-
-
-## Building
+## Building from Source
 
 <details>
-<summary><b>API credentials</b></summary>
+<summary><b>🔑 Telegram API Credentials</b></summary>
 
-Get your own API ID and hash on [Telegram's API credentials page](https://core.telegram.org/api/obtaining_api_id). Pass them to CMake or the configure script when generating project files:
+Get your own API ID and hash on [Telegram's API credentials page](https://core.telegram.org/api/obtaining_api_id). Pass them to CMake or `configure.py`:
 
 ```bash
 -D TDESKTOP_API_ID=YOUR_API_ID -D TDESKTOP_API_HASH=YOUR_API_HASH
@@ -162,13 +222,13 @@ Get your own API ID and hash on [Telegram's API credentials page](https://core.t
 </details>
 
 <details>
-<summary><b>Linux</b></summary>
+<summary><b>🐧 Building on Linux</b></summary>
 
 **Dependencies**
 
-- CMake 3.16 or newer and a C++20 compiler (GCC 12 or Clang 15 and newer)
+- CMake 3.16+ and a C++20 compiler (GCC 12+ or Clang 15+)
 - Qt 6: Core, Gui, Widgets, Network, OpenGL, DBus, Wayland, Svg, ImageFormats
-- Python 3.11 to 3.14 development headers (`python3-dev` / `dev-lang/python`)
+- Python 3.11–3.14 development headers (`python3-dev` / `dev-lang/python`)
 - Telegram Desktop libraries: `tg_owt`, `ffmpeg`, `openal`, `opus`, `rnnoise`, `libjpeg-turbo`, `xxhash`, `minizip`, `ada`, `cld3`, `wallet-engine-telegram`
 
 **Build with CMake**
@@ -186,8 +246,6 @@ cmake --build build --target Telegram
 
 **Python plugin runtime**
 
-Copy the runtime files to `/usr/share/MoltenGram-Desktop/python/extera/`, or keep them next to the binary in `python/extera/`:
-
 ```bash
 sudo mkdir -p /usr/share/MoltenGram-Desktop/python/extera
 sudo cp -r Telegram/SourceFiles/extera/python/* /usr/share/MoltenGram-Desktop/python/extera/
@@ -196,11 +254,11 @@ sudo cp -r Telegram/SourceFiles/extera/python/* /usr/share/MoltenGram-Desktop/py
 </details>
 
 <details>
-<summary><b>Windows</b></summary>
+<summary><b>🪟 Building on Windows</b></summary>
 
 1. Follow the [Telegram Desktop Windows build guide](https://github.com/telegramdesktop/tdesktop/blob/dev/docs/building-win.md).
-2. Put the embedded Python 3.11 runtime in `Libraries/win64/python311`, including the headers, `python311.lib` and the `embed` folder.
-3. Generate the project files with your API ID and hash:
+2. Place the embedded Python 3.11 runtime in `Libraries/win64/python311` (headers, `python311.lib`, and `embed` folder).
+3. Generate project files with your API ID and hash:
 
 ```cmd
 python configure.py x64 -D TDESKTOP_API_ID=YOUR_API_ID -D TDESKTOP_API_HASH=YOUR_API_HASH
@@ -216,6 +274,8 @@ The `python` folder next to `Telegram.exe` is required for plugins.
 
 </details>
 
+---
+
 ## Credits
 
 | Project | Use in MoltenGram Desktop |
@@ -226,8 +286,9 @@ The `python` folder next to `Telegram.exe` is required for plugins.
 | [AyuGram Desktop](https://github.com/AyuGram/AyuGramDesktop) | Desktop implementation references |
 | [tg-ws-proxy](https://github.com/Flowseal/tg-ws-proxy) | Built-in WebSocket proxy, MIT License |
 | [Kangel Plugins Manager](https://git.kangel.xyz/KangelPlugins/PluginManager) | Plugin security check approach and the PluginGuard vector model |
+
 <details>
-<summary><b>Third-party libraries and components</b></summary>
+<summary><b>📚 Third-Party Libraries and Components</b></summary>
 
 - [Telegram Desktop](https://github.com/telegramdesktop/tdesktop): client sources, GPL-3.0 with an OpenSSL linking exception
 - desktop-app libraries: [lib_base](https://github.com/desktop-app/lib_base), [lib_rpl](https://github.com/desktop-app/lib_rpl), [lib_crl](https://github.com/desktop-app/lib_crl), [lib_storage](https://github.com/desktop-app/lib_storage), [lib_tl](https://github.com/desktop-app/lib_tl), [lib_lottie](https://github.com/desktop-app/lib_lottie), [lib_spellcheck](https://github.com/desktop-app/lib_spellcheck), [lib_qr](https://github.com/desktop-app/lib_qr), [lib_webrtc](https://github.com/desktop-app/lib_webrtc), [lib_webview](https://github.com/desktop-app/lib_webview), [lib_translate](https://github.com/desktop-app/lib_translate), [cmake_helpers](https://github.com/desktop-app/cmake_helpers): GPL-3.0 with an OpenSSL linking exception
@@ -292,6 +353,24 @@ The `python` folder next to `Telegram.exe` is required for plugins.
 
 </details>
 
-## License
+<br>
 
-MoltenGram Desktop is distributed under the [GNU General Public License v3.0](LICENSE).
+<div align="center">
+
+<!-- GPL-3.0 FOSS Footer Card -->
+<a href="LICENSE">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/readme/footer-en-dark.svg">
+    <img src="docs/readme/footer-en-light.svg" width="100%" alt="MoltenGram Desktop — Free & Open Source Software under GNU GPL v3.0">
+  </picture>
+</a>
+
+<br>
+
+<!-- Expressive Wave Footer -->
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/readme/wave-dark.svg">
+  <img src="docs/readme/wave-light.svg" width="100%" alt="">
+</picture>
+
+</div>

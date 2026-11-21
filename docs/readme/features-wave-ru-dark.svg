@@ -1,0 +1,67 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="840" height="610" viewBox="0 0 840 610" role="img" aria-label="Возможности MoltenGram Desktop">
+<title>Возможности MoltenGram Desktop</title>
+<style>text{font-family:'Google Sans','Segoe UI',-apple-system,BlinkMacSystemFont,Roboto,'Noto Sans',Arial,sans-serif}
+.up{animation:up .75s cubic-bezier(.05,.7,.1,1) both}
+.pop{transform-box:fill-box;transform-origin:center;animation:pop .55s cubic-bezier(.34,1.56,.64,1) both}
+.fade{animation:fade .8s ease both}
+.spin{transform-box:fill-box;transform-origin:center;animation:spin 42s linear infinite}
+.spin-r{transform-box:fill-box;transform-origin:center;animation:spin 30s linear infinite reverse}
+.bob{transform-box:fill-box;transform-origin:center;animation:bob 7s ease-in-out infinite}
+.wave{animation:wave 2.6s linear infinite}
+@keyframes up{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
+@keyframes pop{from{opacity:0;transform:scale(.75)}to{opacity:1;transform:scale(1)}}
+@keyframes fade{from{opacity:0}to{opacity:1}}
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes bob{0%,100%{transform:translateY(0) rotate(0)}50%{transform:translateY(-9px) rotate(10deg)}}
+@keyframes wave{from{transform:translateX(0)}to{transform:translateX(-48px)}}
+@media (prefers-reduced-motion:reduce){*{animation:none!important}}</style>
+<rect width="840" height="610" rx="32" fill="#1A1110"/>
+<path class="pop" d="M70.0 45.0 L69.2 46.5 L67.3 47.7 L65.1 48.6 L63.6 49.5 L63.2 50.5 L64.0 52.1 L65.2 54.2 L66.1 56.3 L65.8 57.9 L64.3 58.7 L62.0 58.6 L59.7 58.0 L58.0 57.8 L57.0 58.4 L56.8 60.2 L56.6 62.5 L56.0 64.7 L54.8 65.9 L53.2 65.7 L51.4 64.2 L49.8 62.4 L48.6 61.2 L47.4 61.2 L46.2 62.4 L44.6 64.2 L42.8 65.7 L41.2 65.9 L40.0 64.7 L39.4 62.5 L39.2 60.2 L39.0 58.4 L38.0 57.8 L36.3 58.0 L34.0 58.6 L31.7 58.7 L30.2 57.9 L29.9 56.3 L30.8 54.2 L32.0 52.1 L32.8 50.5 L32.4 49.5 L30.9 48.6 L28.7 47.7 L26.8 46.5 L26.0 45.0 L26.8 43.5 L28.7 42.3 L30.9 41.4 L32.4 40.5 L32.8 39.5 L32.0 37.9 L30.8 35.8 L29.9 33.7 L30.2 32.1 L31.7 31.3 L34.0 31.4 L36.3 32.0 L38.0 32.2 L39.0 31.6 L39.2 29.8 L39.4 27.5 L40.0 25.3 L41.2 24.1 L42.8 24.3 L44.6 25.8 L46.2 27.6 L47.4 28.8 L48.6 28.8 L49.8 27.6 L51.4 25.8 L53.2 24.3 L54.8 24.1 L56.0 25.3 L56.6 27.5 L56.8 29.8 L57.0 31.6 L58.0 32.2 L59.7 32.0 L62.0 31.4 L64.3 31.3 L65.8 32.1 L66.1 33.7 L65.2 35.8 L64.0 37.9 L63.2 39.5 L63.6 40.5 L65.1 41.4 L67.3 42.3 L69.2 43.5 Z" fill="#6B2418"/>
+<g transform="translate(38,35) scale(0.83)"><path d="M12 2l2.4 6.6L21 11l-6.6 2.4L12 20l-2.4-6.6L3 11l6.6-2.4L12 2z" fill="#EE6B54"/></g>
+<text x="80" y="52" fill="#F6E0DC" font-size="22" font-weight="800">Возможности MoltenGram Desktop</text>
+<rect x="640" y="28" width="172" height="34" rx="17" fill="#3C2420"/>
+<text x="726" y="50" fill="#FFB4A5" font-size="13" font-weight="700" text-anchor="middle">Волна 1 + Волна 2</text>
+<g class="up" style="animation-delay:0.05s">
+  <rect x="28" y="86" width="784" height="62" rx="18" fill="#251917"/>
+  <rect x="42" y="102" width="144" height="30" rx="15" fill="#32221F"/>
+  <text x="114" y="121" fill="#EE6B54" font-size="11.5" font-weight="700" text-anchor="middle">ВОЛНА 1 · UI</text>
+  <text x="202" y="113" fill="#F6E0DC" font-size="15.5" font-weight="700">44 MD3-формы аватаров, Матовое стекло и 27 иконок</text>
+  <text x="202" y="133" fill="#D8C1BC" font-size="12.5" font-weight="400">Стилизация профилей через бота, MD3-карусель медиа, цветной текст и автокоманды</text>
+</g><g class="up" style="animation-delay:0.09s">
+  <rect x="28" y="158" width="784" height="62" rx="18" fill="#251917"/>
+  <rect x="42" y="174" width="144" height="30" rx="15" fill="#32221F"/>
+  <text x="114" y="193" fill="#EE6B54" font-size="11.5" font-weight="700" text-anchor="middle">ВОЛНА 1 · МЕДИА</text>
+  <text x="202" y="185" fill="#F6E0DC" font-size="15.5" font-weight="700">Локальные плейлисты и умная очистка URL</text>
+  <text x="202" y="205" fill="#D8C1BC" font-size="12.5" font-weight="400">Плейлисты в аудиоплеере и автоудаление UTM/трекинг-параметров из ссылок</text>
+</g><g class="up" style="animation-delay:0.13s">
+  <rect x="28" y="230" width="784" height="62" rx="18" fill="#251917"/>
+  <rect x="42" y="246" width="144" height="30" rx="15" fill="#6B2418"/>
+  <text x="114" y="265" fill="#FFDAD3" font-size="11.5" font-weight="700" text-anchor="middle">ВОЛНА 2 · ЗВУК</text>
+  <text x="202" y="257" fill="#F6E0DC" font-size="15.5" font-weight="700">Модулятор голоса и SongRec (Shazam / AudD)</text>
+  <text x="202" y="277" fill="#D8C1BC" font-size="12.5" font-weight="400">Пресеты изменения голоса при записи и мгновенное распознавание треков</text>
+</g><g class="up" style="animation-delay:0.17s">
+  <rect x="28" y="302" width="784" height="62" rx="18" fill="#251917"/>
+  <rect x="42" y="318" width="144" height="30" rx="15" fill="#6B2418"/>
+  <text x="114" y="337" fill="#FFDAD3" font-size="11.5" font-weight="700" text-anchor="middle">ВОЛНА 2 · ПРОФИЛЬ</text>
+  <text x="202" y="329" fill="#F6E0DC" font-size="15.5" font-weight="700">Бейджи PillStack и статус NowPlaying (Last.fm)</text>
+  <text x="202" y="349" fill="#D8C1BC" font-size="12.5" font-weight="400">Экспрессивные MD3-бейджи в профиле и автообновление трека Last.fm</text>
+</g><g class="up" style="animation-delay:0.21s">
+  <rect x="28" y="374" width="784" height="62" rx="18" fill="#251917"/>
+  <rect x="42" y="390" width="144" height="30" rx="15" fill="#6B2418"/>
+  <text x="114" y="409" fill="#FFDAD3" font-size="11.5" font-weight="700" text-anchor="middle">ВОЛНА 2 · ПРИВАТ</text>
+  <text x="202" y="401" fill="#F6E0DC" font-size="15.5" font-weight="700">Подмена устройства, Double-Tap и удалённые цитаты</text>
+  <text x="202" y="421" fill="#D8C1BC" font-size="12.5" font-weight="400">Спуфинг модели/ОС в MTProto, действия двойного клика и сохранённые цитаты</text>
+</g><g class="up" style="animation-delay:0.25s">
+  <rect x="28" y="446" width="784" height="62" rx="18" fill="#251917"/>
+  <rect x="42" y="462" width="144" height="30" rx="15" fill="#6B2418"/>
+  <text x="114" y="481" fill="#FFDAD3" font-size="11.5" font-weight="700" text-anchor="middle">ВОЛНА 2 · QR</text>
+  <text x="202" y="473" fill="#F6E0DC" font-size="15.5" font-weight="700">Экспрессивный MD3 QR-генератор</text>
+  <text x="202" y="493" fill="#D8C1BC" font-size="12.5" font-weight="400">Фирменные Material 3 Expressive QR-карточки для профилей, каналов и инвайтов</text>
+</g><g class="up" style="animation-delay:0.29s">
+  <rect x="28" y="518" width="784" height="62" rx="18" fill="#251917"/>
+  <rect x="42" y="534" width="144" height="30" rx="15" fill="#32221F"/>
+  <text x="114" y="553" fill="#EE6B54" font-size="11.5" font-weight="700" text-anchor="middle">ЯДРО · ПЛАГИНЫ</text>
+  <text x="202" y="545" fill="#F6E0DC" font-size="15.5" font-weight="700">AyuGram, tg-ws-proxy и PluginGuard AI</text>
+  <text x="202" y="565" fill="#D8C1BC" font-size="12.5" font-weight="400">Режим призрака, история правок, Streamer Mode, песочница плагинов и AI Chat</text>
+</g>
+</svg>
