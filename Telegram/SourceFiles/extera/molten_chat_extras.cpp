@@ -30,6 +30,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/effects/reaction_fly_animation.h"
 #include "ui/layers/generic_box.h"
 #include "ui/text/text_entity.h"
+#include "ui/vertical_list.h"
 #include "ui/widgets/buttons.h"
 #include "ui/widgets/checkbox.h"
 #include "ui/widgets/fields/input_field.h"
@@ -593,9 +594,12 @@ TextWithEntities RewriteReplyToQuote(
 	const auto shift = prefix.text.size();
 	auto combined = prefix;
 	combined.text += replyText.text;
-	for (auto ent : replyText.entities) {
-		ent.offset += shift;
-		combined.entities.push_back(ent);
+	for (const auto &ent : replyText.entities) {
+		combined.entities.push_back(EntityInText(
+			ent.type(),
+			ent.offset() + shift,
+			ent.length(),
+			ent.data()));
 	}
 	return combined;
 }
@@ -616,7 +620,7 @@ void AddDoubleTapSettings(
 	const auto enableCheckbox = container->add(
 		object_ptr<Ui::Checkbox>(
 			container,
-			rpl::single(u"Enable Double-Tap Actions on Messages"_q),
+			u"Enable Double-Tap Actions on Messages"_q,
 			DoubleTapEnabled(),
 			st::defaultCheckbox));
 
@@ -636,20 +640,20 @@ void AddDoubleTapSettings(
 			st::defaultFlatLabel));
 
 	const auto incomingRadioGroup = std::make_shared<Ui::RadiobuttonGroup>(
-		ActionId(IncomingAction()));
+		ActionToInt(IncomingAction()));
 
 	for (const auto action : AllActions()) {
 		options->add(
 			object_ptr<Ui::Radiobutton>(
 				options,
 				incomingRadioGroup,
-				ActionId(action),
+				ActionToInt(action),
 				ActionName(action),
 				st::defaultRadio));
 	}
 
-	incomingRadioGroup->setChangedCallback([=](const QString &id) {
-		SetIncomingAction(ActionFromId(id));
+	incomingRadioGroup->setChangedCallback([=](int val) {
+		SetIncomingAction(ActionFromInt(val));
 	});
 
 	// Outgoing Action Selection
@@ -661,20 +665,20 @@ void AddDoubleTapSettings(
 			st::defaultFlatLabel));
 
 	const auto outgoingRadioGroup = std::make_shared<Ui::RadiobuttonGroup>(
-		ActionId(OutgoingAction()));
+		ActionToInt(OutgoingAction()));
 
 	for (const auto action : AllActions()) {
 		options->add(
 			object_ptr<Ui::Radiobutton>(
 				options,
 				outgoingRadioGroup,
-				ActionId(action),
+				ActionToInt(action),
 				ActionName(action),
 				st::defaultRadio));
 	}
 
-	outgoingRadioGroup->setChangedCallback([=](const QString &id) {
-		SetOutgoingAction(ActionFromId(id));
+	outgoingRadioGroup->setChangedCallback([=](int val) {
+		SetOutgoingAction(ActionFromInt(val));
 	});
 
 	// Quick Reaction Emoji
@@ -693,7 +697,7 @@ void AddDoubleTapSettings(
 			DefaultReactionEmoji()));
 
 	reactionField->changes(
-	) | rpl::start_with_next([=] {
+	) | rpl::on_next([=] {
 		const auto text = reactionField->getLastText().trimmed();
 		if (!text.isEmpty()) {
 			SetDefaultReactionEmoji(text);
@@ -719,7 +723,7 @@ void AddDoubleTapSettings(
 
 	optionsWrap->toggle(DoubleTapEnabled(), anim::type::instant);
 	enableCheckbox->checkedChanges(
-	) | rpl::start_with_next([=](bool checked) {
+	) | rpl::on_next([=](bool checked) {
 		SetDoubleTapEnabled(checked);
 		optionsWrap->toggle(checked, anim::type::normal);
 	}, enableCheckbox->lifetime());
@@ -733,12 +737,12 @@ void AddDeletedReplyQuoteSettings(
 	const auto retainCheckbox = container->add(
 		object_ptr<Ui::Checkbox>(
 			container,
-			rpl::single(u"Preserve Deleted Reply Quotes"_q),
+			u"Preserve Deleted Reply Quotes"_q,
 			DeletedReplyQuoteEnabled(),
 			st::defaultCheckbox));
 
 	retainCheckbox->checkedChanges(
-	) | rpl::start_with_next([=](bool checked) {
+	) | rpl::on_next([=](bool checked) {
 		SetDeletedReplyQuoteEnabled(checked);
 	}, retainCheckbox->lifetime());
 
@@ -753,12 +757,12 @@ void AddDeletedReplyQuoteSettings(
 	const auto rewriteCheckbox = container->add(
 		object_ptr<Ui::Checkbox>(
 			container,
-			rpl::single(u"Quote Deleted Messages in New Replies"_q),
+			u"Quote Deleted Messages in New Replies"_q,
 			ReplyToDeletedAsQuoteEnabled(),
 			st::defaultCheckbox));
 
 	rewriteCheckbox->checkedChanges(
-	) | rpl::start_with_next([=](bool checked) {
+	) | rpl::on_next([=](bool checked) {
 		SetReplyToDeletedAsQuoteEnabled(checked);
 	}, rewriteCheckbox->lifetime());
 

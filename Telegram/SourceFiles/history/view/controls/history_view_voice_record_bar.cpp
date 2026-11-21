@@ -3033,7 +3033,30 @@ void VoiceRecordBar::stopRecording(StopType type, bool ttlBeforeHide) {
 
 			window()->raise();
 			window()->activateWindow();
+			const auto options = Api::SendOptions{
+				.ttlSeconds = (ttlBeforeHide
+					? std::numeric_limits<int>::max()
+					: 0),
+			};
 			if (Extera::VoiceChanger::Enabled()) {
+				if (Extera::VoiceChanger::PreviewBeforeSend()
+					&& _show
+					&& _show->resolveWindow()) {
+					Extera::VoiceChanger::ShowVoiceChangerDialog(
+						_show->resolveWindow(),
+						_data.content,
+						_data.duration,
+						_data.waveform,
+						[=](Extera::VoiceChanger::ProcessResult &&result) {
+							_sendVoiceRequests.fire({
+								.bytes = result.bytes,
+								.waveform = result.waveform,
+								.duration = result.duration,
+								.options = options,
+							});
+						});
+					return;
+				}
 				auto processed = Extera::VoiceChanger::ProcessVoiceBytes(_data.content);
 				if (!processed.bytes.isEmpty()) {
 					_data.content = std::move(processed.bytes);
@@ -3041,11 +3064,6 @@ void VoiceRecordBar::stopRecording(StopType type, bool ttlBeforeHide) {
 					_data.duration = processed.duration;
 				}
 			}
-			const auto options = Api::SendOptions{
-				.ttlSeconds = (ttlBeforeHide
-					? std::numeric_limits<int>::max()
-					: 0),
-			};
 			_sendVoiceRequests.fire({
 				.bytes = _data.content,
 				.waveform = _data.waveform,

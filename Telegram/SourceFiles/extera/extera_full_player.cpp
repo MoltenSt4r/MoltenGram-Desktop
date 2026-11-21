@@ -1765,7 +1765,7 @@ void View::contextMenuEvent(QContextMenuEvent *e) {
 	}, &st::menuIconFave);
 	_pluginMenu->addAction(u"Identify Music (SongRec)"_q, [=] {
 		Extera::SongRec::RecognizeCurrentPlayback(_controller);
-	}, &st::menuIconMicrophone);
+	}, &st::menuIconSoundOn);
 
 	const auto items = Extera::Plugins::PlayerMenuItems();
 	if (!items.empty()) {

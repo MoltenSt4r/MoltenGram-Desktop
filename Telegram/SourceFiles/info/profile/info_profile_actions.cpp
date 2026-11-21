@@ -10,6 +10,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "extera/extera_config.h"
 #include "extera/extera_streamer.h"
 #include "extera/extera_plugins.h"
+#include "extera/molten_qr.h"
 
 #include "api/api_blocked_peers.h"
 #include "api/api_chat_participants.h"
@@ -1921,6 +1922,19 @@ Section DetailsFiller::makeInfo() {
 		qrButton->setAccessibleName(tr::lng_group_invite_context_qr(tr::now));
 		const auto rightSkip = st::infoProfileLabeledButtonQrRightSkip;
 		const auto showQr = [=, show = controller->uiShow()] {
+			if (Extera::Bool(u"qr_md3_card"_q)) {
+				const auto uname = user->username();
+				const auto link = !uname.isEmpty()
+					? user->session().createInternalLinkFull(uname)
+					: QString();
+				if (!link.isEmpty()) {
+					Extera::QrGenerator::ShowQrShareBox(
+						controller->parentController(),
+						link,
+						user->name());
+					return false;
+				}
+			}
 			Ui::DefaultShowFillPeerQrBoxCallback(show, user);
 			return false;
 		};
@@ -2038,6 +2052,19 @@ Section DetailsFiller::makeInfo() {
 			fitLabelToButton(qr, linkLine.subtext, rightSkip);
 			const auto peer = _peer;
 			qr->setClickedCallback([=, show = controller->uiShow()] {
+				if (Extera::Bool(u"qr_md3_card"_q)) {
+					const auto uname = peer->username();
+					const auto link = !uname.isEmpty()
+						? peer->session().createInternalLinkFull(uname)
+						: QString();
+					if (!link.isEmpty()) {
+						Extera::QrGenerator::ShowQrShareBox(
+							controller->parentController(),
+							link,
+							peer->name());
+						return false;
+					}
+				}
 				Ui::DefaultShowFillPeerQrBoxCallback(show, peer);
 				return false;
 			});

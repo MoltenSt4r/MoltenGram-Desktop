@@ -7,8 +7,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "media/audio/media_audio_capture.h"
 
-#include "extera/molten_voice_changer.h"
-
 #include "media/audio/media_audio_capture_common.h"
 #include "media/audio/media_audio_ffmpeg_loader.h"
 #include "media/audio/media_audio_track.h"
@@ -720,13 +718,6 @@ bool Instance::Inner::processFrame(int32 offset, int32 framesize) {
 
 	auto srcSamplesDataChannel = (short*)(_captured.data() + offset);
 	auto srcSamplesData = &srcSamplesDataChannel;
-
-	if (Extera::VoiceChanger::Enabled()) {
-		Extera::VoiceChanger::ProcessPcmStream(
-			srcSamplesDataChannel,
-			samplesCnt,
-			kCaptureFrequency);
-	}
 
 	//	memcpy(d->srcSamplesData[0], _captured.constData() + offset, framesize);
 	auto skipSamples = static_cast<int>(kCaptureSkipDuration * kCaptureFrequency / 1000);

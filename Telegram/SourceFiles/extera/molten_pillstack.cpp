@@ -35,7 +35,9 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include <QtCore/QJsonObject>
 #include <QtCore/QJsonArray>
 #include <QtCore/QJsonValue>
+#include <QtCore/QPointer>
 #include <QtCore/QStandardPaths>
+#include <QtCore/QTimer>
 #include <QtCore/QUrl>
 #include <QtGui/QPainter>
 #include <QtGui/QPainterPath>
@@ -53,12 +55,12 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 #include <cmath>
 #include <algorithm>
+#include <memory>
 
 #if defined(Q_OS_LINUX)
 #include <unistd.h>
 #elif defined(Q_OS_WIN)
-#include <windows.h>
-#include <psapi.h>
+#include "platform/win/windows_dlls.h"
 #elif defined(Q_OS_MAC)
 #include <mach/mach.h>
 #endif
@@ -280,7 +282,8 @@ void SampleMemoryUsage() {
 		state.systemPercent = int(memInfo.dwMemoryLoad);
 	}
 	PROCESS_MEMORY_COUNTERS pmc;
-	if (GetProcessMemoryInfo(GetCurrentProcess(), &pmc, sizeof(pmc))) {
+	if (Platform::Dlls::GetProcessMemoryInfo
+		&& Platform::Dlls::GetProcessMemoryInfo(GetCurrentProcess(), &pmc, sizeof(pmc))) {
 		state.processRssMb = int(pmc.WorkingSetSize / (1024 * 1024));
 	}
 #elif defined(Q_OS_MAC)
@@ -296,9 +299,9 @@ void SampleMemoryUsage() {
 			state.systemPercent = int((used * 100) / total);
 		}
 	}
-	struct task_basic_info info;
-	mach_msg_type_number_t size = sizeof(info);
-	if (task_info(mach_task_self(), TASK_BASIC_INFO, (task_info_t)&info, &size) == KERN_SUCCESS) {
+	mach_task_basic_info info;
+	mach_msg_type_number_t size = MACH_TASK_BASIC_INFO_COUNT;
+	if (task_info(mach_task_self(), MACH_TASK_BASIC_INFO, (task_info_t)&info, &size) == KERN_SUCCESS) {
 		state.processRssMb = int(info.resident_size / (1024 * 1024));
 	}
 #endif
@@ -622,35 +625,40 @@ void TriggerDcPingProbe(Window::SessionController *controller) {
 	const auto host = GetDcHost(state.dcId);
 
 	auto socket = new QTcpSocket();
-	auto timer = new QElapsedTimer();
+	auto timer = std::make_shared<QElapsedTimer>();
+	auto finished = std::make_shared<bool>(false);
+	const auto guardSocket = QPointer<QTcpSocket>(socket);
 	timer->start();
 
-	QObject::connect(socket, &QTcpSocket::connected, [=, &state] {
-		state.pingMs = int(timer->elapsed());
-		state.lastProbeTime = QDateTime::currentMSecsSinceEpoch();
+	const auto finish = [guardSocket, finished, &state](bool connected, const std::shared_ptr<QElapsedTimer> &t) {
+		if (*finished) {
+			return;
+		}
+		*finished = true;
+		if (connected) {
+			state.pingMs = int(t->elapsed());
+			state.lastProbeTime = QDateTime::currentMSecsSinceEpoch();
+		}
 		state.inFlight = false;
-		socket->abort();
-		socket->deleteLater();
-		delete timer;
+		if (guardSocket) {
+			guardSocket->abort();
+			guardSocket->deleteLater();
+		}
+	};
+
+	QObject::connect(socket, &QTcpSocket::connected, [finish, timer] {
+		finish(true, timer);
 	});
 
-	QObject::connect(socket, &QTcpSocket::errorOccurred, [=, &state](QAbstractSocket::SocketError) {
-		state.inFlight = false;
-		socket->abort();
-		socket->deleteLater();
-		delete timer;
+	QObject::connect(socket, &QTcpSocket::errorOccurred, [finish, timer](QAbstractSocket::SocketError) {
+		finish(false, timer);
 	});
 
 	socket->connectToHost(host, 443);
 
 	// Timeout safeguard
-	QTimer::singleShot(2500, socket, [=, &state] {
-		if (state.inFlight) {
-			state.inFlight = false;
-			socket->abort();
-			socket->deleteLater();
-			delete timer;
-		}
+	QTimer::singleShot(2500, socket, [finish, timer] {
+		finish(false, timer);
 	});
 }
 
@@ -1041,7 +1049,7 @@ void Widget::mouseMoveEvent(QMouseEvent *e) {
 	}
 }
 
-void Widget::leaveEvent(QEvent *e) {
+void Widget::leaveEventHook(QEvent *e) {
 	if (_hoveredIndex != -1) {
 		_hoveredIndex = -1;
 		setToolTip(QString());

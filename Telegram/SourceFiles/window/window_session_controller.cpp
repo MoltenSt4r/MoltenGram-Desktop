@@ -7,6 +7,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "window/window_session_controller.h"
 
+#include "extera/molten_nowplaying.h"
+
 #include "apiwrap.h"
 #include "api/api_cloud_password.h"
 #include "api/api_text_entities.h"
@@ -1762,6 +1764,7 @@ SessionController::SessionController(
 	_chatStyleTheme = _defaultChatTheme;
 	_chatStyle->apply(_defaultChatTheme.get());
 	Exd::SettingsSync::Start(session);
+	Extera::NowPlaying::Service::Instance();
 
 	pushDefaultChatBackground();
 	Theme::Background()->updates(

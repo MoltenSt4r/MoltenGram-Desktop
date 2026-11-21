@@ -13,6 +13,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "extera/extera_utils.h"
 
 #include "extera/extera_config.h"
+#include "extera/molten_chat_extras.h"
 
 #include "api/api_compose_with_ai.h"
 #include "api/api_editing.h"
@@ -6220,6 +6221,29 @@ void HistoryWidget::sendTextWithTags(
 
 	auto message = Api::MessageToSend(prepareSendAction(options));
 	message.textWithTags = textWithTags;
+	if (Extera::ChatExtras::ReplyToDeletedAsQuoteEnabled()
+		&& message.action.replyTo.messageId) {
+		const auto replyId = message.action.replyTo.messageId;
+		const auto targetItem = session().data().message(replyId);
+		const auto retained = Extera::ChatExtras::FindRetainedQuote(replyId);
+		if (retained
+			&& (!targetItem
+				|| Extera::ChatExtras::ShouldRewriteReplyToQuote(targetItem))) {
+			auto parsed = TextWithEntities{
+				message.textWithTags.text,
+				TextUtilities::ConvertTextTagsToEntities(
+					message.textWithTags.tags),
+			};
+			const auto rewritten = Extera::ChatExtras::RewriteReplyToQuote(
+				*retained,
+				parsed);
+			message.textWithTags = {
+				rewritten.text,
+				TextUtilities::ConvertEntitiesToTextTags(rewritten.entities),
+			};
+			message.action.replyTo = FullReplyTo();
+		}
+	}
 	if (useWebPageDraft && _preview) {
 		message.webPage = _preview->draft();
 	}

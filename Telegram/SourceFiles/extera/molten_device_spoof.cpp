@@ -14,6 +14,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "styles/style_settings.h"
 #include "ui/layers/generic_box.h"
 #include "ui/toast/toast.h"
+#include "ui/vertical_list.h"
 #include "ui/widgets/buttons.h"
 #include "ui/widgets/checkbox.h"
 #include "ui/widgets/fields/input_field.h"
@@ -285,8 +286,18 @@ void ShowSettingsBox(not_null<Window::SessionController*> controller) {
 		Ui::AddSkip(container, st::settingsCheckboxesSkip);
 		Ui::AddSubsectionTitle(container, rpl::single(u"Device Presets"_q));
 
+		const auto &presets = AllPresets();
+		const auto currentId = SelectedPresetId();
+		int initialIndex = 0;
+		for (int i = 0; i < int(presets.size()); ++i) {
+			if (presets[i].id == currentId) {
+				initialIndex = i;
+				break;
+			}
+		}
+
 		const auto radioGroup = std::make_shared<Ui::RadiobuttonGroup>(
-			SelectedPresetId());
+			initialIndex);
 
 		struct CustomFields {
 			Ui::InputField *modelField = nullptr;
@@ -296,14 +307,14 @@ void ShowSettingsBox(not_null<Window::SessionController*> controller) {
 		};
 		auto customFields = std::make_shared<CustomFields>();
 
-		for (const auto &preset : AllPresets()) {
-			const auto isCustom = preset.isCustom;
+		for (int i = 0; i < int(presets.size()); ++i) {
+			const auto &preset = presets[i];
 			const auto text = preset.title + u"\n"_q + preset.formattedSummary();
 			const auto btn = container->add(
 				object_ptr<Ui::Radiobutton>(
 					container,
 					radioGroup,
-					preset.id,
+					i,
 					text,
 					st::defaultRadio));
 			btn->setCheckAlignment(style::al_topleft);
@@ -341,19 +352,27 @@ void ShowSettingsBox(not_null<Window::SessionController*> controller) {
 				CustomAppVersion()));
 		customFields->appVerField = customAppVer;
 
+		const auto selectedPresetIdFor = [=](int idx) -> QString {
+			const auto &list = AllPresets();
+			if (idx >= 0 && idx < int(list.size())) {
+				return list[idx].id;
+			}
+			return kDefaultPresetId;
+		};
+
 		const auto updateCustomVisibility = [=] {
-			const auto customSelected = (radioGroup->value() == u"custom"_q);
+			const auto customSelected = (selectedPresetIdFor(radioGroup->current()) == u"custom"_q);
 			customFields->wrap->setVisible(customSelected);
 		};
 		updateCustomVisibility();
 
-		radioGroup->setChangedCallback([=](const QString &) {
+		radioGroup->setChangedCallback([=](int) {
 			updateCustomVisibility();
 		});
 
 		box->addButton(rpl::single(u"Save & Apply"_q), [=] {
 			const auto enabled = enableCheckbox->checked();
-			const auto selectedId = radioGroup->value();
+			const auto selectedId = selectedPresetIdFor(radioGroup->current());
 			SetEnabled(enabled);
 			SetSelectedPresetId(selectedId);
 			if (selectedId == u"custom"_q) {

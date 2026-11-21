@@ -19,6 +19,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "lang/lang_keys.h"
 #include "media/audio/media_audio_capture.h"
 #include "media/player/media_player_instance.h"
+#include "settings.h"
 #include "styles/style_boxes.h"
 #include "styles/style_layers.h"
 #include "styles/style_settings.h"
@@ -49,6 +50,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include <QtGui/QGuiApplication>
 #include <QtGui/QImage>
 #include <QtGui/QPainter>
+#include <QtGui/QPainterPath>
 #include <QtNetwork/QHttpMultiPart>
 #include <QtNetwork/QNetworkAccessManager>
 #include <QtNetwork/QNetworkReply>
@@ -617,7 +619,7 @@ QString TrackResult::effectiveCover() const {
 
 QString TrackResult::formatted() const {
 	if (!artist.isEmpty() && !title.isEmpty()) {
-		return artist + u" \xE2\x80\x94 "_q + title;
+		return artist + u" \u2014 "_q + title;
 	}
 	return !title.isEmpty() ? title : artist;
 }
@@ -1325,12 +1327,12 @@ void Service::showResultBox(
 		}, coverContainer->lifetime());
 
 		if (!result.coverUrl.isEmpty()) {
-			downloadCover(result.coverUrl, [=](QString local) {
+			downloadCover(result.coverUrl, crl::guard(coverContainer, [=](QString local) {
 				if (!local.isEmpty()) {
 					coverState->load(local);
 					coverContainer->update();
 				}
-			});
+			}));
 		}
 
 		// Title Label
@@ -1359,11 +1361,11 @@ void Service::showResultBox(
 		}
 
 		// Action Buttons
-		box->addButton(u"Search on YouTube"_q, [=] {
+		box->addButton(rpl::single(u"Search on YouTube"_q), [=] {
 			QDesktopServices::openUrl(QUrl(result.searchUrl()));
 		});
 
-		box->addButton(u"Copy Info"_q, [=] {
+		box->addButton(rpl::single(u"Copy Info"_q), [=] {
 			QGuiApplication::clipboard()->setText(result.formatted());
 			Ui::Toast::Show(u"Copied to clipboard"_q);
 		});
@@ -1416,7 +1418,7 @@ void Service::showSettingsBox(not_null<Window::SessionController*> controller) {
 				st::boxLabel));
 
 		// Test Recognition Button
-		box->addButton(u"Listen with Mic"_q, [=] {
+		box->addButton(rpl::single(u"Listen with Mic"_q), [=] {
 			box->closeBox();
 			RecognizeFromMic(controller);
 		});
