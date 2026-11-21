@@ -1,27 +1,28 @@
 <p align="center">
-  <a href="https://github.com/metawka/exDesktop/stargazers"><img src="docs/banner_ru.png" alt="Поддержать звёздочкой на GitHub" width="100%"></a>
+  <a href="https://github.com/MoltenSt4r/MoltenGram-Desktop/stargazers"><img src="docs/banner_ru.png" alt="Поддержать звёздочкой на GitHub" width="100%"></a>
 </p>
 
 <p align="center">
-  <img src="docs/logo.png" width="120" alt="exDesktop">
+  <img src="docs/logo.png" width="120" alt="MoltenGram Desktop">
 </p>
 
-<h1 align="center">exDesktop</h1>
+<h1 align="center">MoltenGram Desktop</h1>
 
 <p align="center">
   Модифицированный кросс-платформенный клиент для Windows, Linux и macOS на основе исходного кода
-  <a href="https://github.com/telegramdesktop/tdesktop">Telegram Desktop</a>.<br>
+  <a href="https://github.com/telegramdesktop/tdesktop">Telegram Desktop</a> и
+  <a href="https://github.com/metawka/exDesktop">exDesktop</a>.<br>
   Material Design Expressive, глубокая кастомизация, функции приватности, настройки визуала, режим стримера, функционал exteraGram, AyuGram и других клиентов сообщества, адаптированный под Desktop.
 </p>
 
 <p align="center">
-  <a href="https://github.com/metawka/exDesktop/releases/latest"><img src="https://img.shields.io/github/v/release/metawka/exDesktop?label=%D0%92%D0%B5%D1%80%D1%81%D0%B8%D1%8F&color=ee6b54" alt="Версия"></a>
-  <a href="https://github.com/metawka/exDesktop/releases"><img src="https://img.shields.io/github/downloads/metawka/exDesktop/total?label=%D0%97%D0%B0%D0%B3%D1%80%D1%83%D0%B7%D0%BA%D0%B8&color=ee6b54" alt="Загрузки"></a>
+  <a href="https://github.com/MoltenSt4r/MoltenGram-Desktop/releases/latest"><img src="https://img.shields.io/github/v/release/MoltenSt4r/MoltenGram-Desktop?label=%D0%92%D0%B5%D1%80%D1%81%D0%B8%D1%8F&color=ee6b54" alt="Версия"></a>
+  <a href="https://github.com/MoltenSt4r/MoltenGram-Desktop/releases"><img src="https://img.shields.io/github/downloads/MoltenSt4r/MoltenGram-Desktop/total?label=%D0%97%D0%B0%D0%B3%D1%80%D1%83%D0%B7%D0%BA%D0%B8&color=ee6b54" alt="Загрузки"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/Лицензия-GPL--3.0-ee6b54" alt="Лицензия"></a>
   <br>
-  <a href="https://t.me/exDesktop"><img src="https://img.shields.io/badge/Канал-@exDesktop-2aabee?logo=telegram&logoColor=white" alt="Канал"></a>
-  <a href="https://t.me/exDesktopChat"><img src="https://img.shields.io/badge/Чат-@exDesktopChat-2aabee?logo=telegram&logoColor=white" alt="Чат"></a>
-  <a href="https://exdesktop.xyz"><img src="https://img.shields.io/badge/Сайт-exdesktop.xyz-2aabee" alt="Сайт"></a>
+  <a href="https://t.me/MoltenGram"><img src="https://img.shields.io/badge/Канал-@MoltenGram-2aabee?logo=telegram&logoColor=white" alt="Канал"></a>
+  <a href="https://t.me/MoltenGramBot"><img src="https://img.shields.io/badge/Поддержка-@MoltenGramBot-2aabee?logo=telegram&logoColor=white" alt="Поддержка"></a>
+  <a href="https://www.moltenstar.space"><img src="https://img.shields.io/badge/Сайт-moltenstar.space-2aabee" alt="Сайт"></a>
 </p>
 
 <p align="center">
@@ -132,19 +133,19 @@
   </tr>
 </table>
 
-## Установить exDesktop
+## Установить MoltenGram Desktop
 
 | Система | Файл |
 |:--|:--|
-| Windows | установщик `exDesktop-setup-x64.*.exe` или портативная версия `exDesktop-portable-x64.*.zip` |
-| Linux (альтернативный) | `exDesktop-linux-x64.*.tar.gz`, запуск файла `exDesktop` из архива |
-| macOS (альтернативный) | `exDesktop-macos-arm64.*.dmg` или `.zip` для Apple Silicon |
+| Windows | установщик `MoltenGram-Desktop-setup-x64.*.exe` или портативная версия `MoltenGram-Desktop-portable-x64.*.zip` |
+| Linux (альтернативный) | `MoltenGram-Desktop-linux-x64.*.tar.gz`, запуск файла `MoltenGram-Desktop` из архива |
+| macOS (альтернативный) | `MoltenGram-Desktop-macos-arm64.*.dmg` или `.zip` для Apple Silicon |
 
 ## Установка на Linux / macOS
 ```bash
-curl -fsSL https://raw.githubusercontent.com/metawka/exDesktop/main/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/MoltenSt4r/MoltenGram-Desktop/main/install.sh | sh
 ```
-Все файлы доступны на [странице релизов](https://github.com/metawka/exDesktop/releases/latest).
+Все файлы доступны на [странице релизов](https://github.com/MoltenSt4r/MoltenGram-Desktop/releases/latest).
 
 
 ## Сборка из исходного кода
@@ -183,19 +184,13 @@ cmake -B build -G Ninja \
 cmake --build build --target Telegram
 ```
 
-**Gentoo**
-
-```bash
-emerge net-im/exdesktop
-```
-
 **Среда Python для плагинов**
 
-Файлы среды копируются в `/usr/share/exDesktop/python/extera/` или лежат рядом с программой в `python/extera/`:
+Файлы среды копируются в `/usr/share/MoltenGram-Desktop/python/extera/` или лежат рядом с программой в `python/extera/`:
 
 ```bash
-sudo mkdir -p /usr/share/exDesktop/python/extera
-sudo cp -r Telegram/SourceFiles/extera/python/* /usr/share/exDesktop/python/extera/
+sudo mkdir -p /usr/share/MoltenGram-Desktop/python/extera
+sudo cp -r Telegram/SourceFiles/extera/python/* /usr/share/MoltenGram-Desktop/python/extera/
 ```
 
 </details>
@@ -227,6 +222,7 @@ cmake --build out --config Release --target Telegram
 |  |  |
 |:--|:--|
 | [Telegram Desktop](https://github.com/telegramdesktop/tdesktop) | Исходный код клиента |
+| [exDesktop](https://github.com/metawka/exDesktop) | Базовый форк для десктопа |
 | [exteraGram](https://github.com/exteraSquad/exteraGram) | Функции и формат плагинов |
 | [AyuGram Desktop](https://github.com/AyuGram/AyuGramDesktop) | Примеры реализации для компьютера |
 | [tg-ws-proxy](https://github.com/Flowseal/tg-ws-proxy) | Встроенный WebSocket-прокси, лицензия MIT |

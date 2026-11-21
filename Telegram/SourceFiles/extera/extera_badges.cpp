@@ -239,12 +239,12 @@ bool ApplyHashes(const QByteArray &bytes) {
 
 [[nodiscard]] QNetworkRequest FileRequest(const QString &name, bool fresh) {
 	auto request = QNetworkRequest(QUrl(fresh
-		? (u"https://api.github.com/repos/metawka/exDesktop/contents/"_q
+		? (u"https://api.github.com/repos/MoltenSt4r/MoltenGram-Desktop/contents/"_q
 			+ name
 			+ u"?ref=main"_q)
-		: (u"https://raw.githubusercontent.com/metawka/exDesktop/main/"_q
+		: (u"https://raw.githubusercontent.com/MoltenSt4r/MoltenGram-Desktop/main/"_q
 			+ name)));
-	request.setRawHeader("User-Agent", "exDesktop");
+	request.setRawHeader("User-Agent", "MoltenGram-Desktop");
 	if (fresh) {
 		request.setRawHeader("Accept", "application/vnd.github.raw");
 		request.setRawHeader("Cache-Control", "no-cache");
@@ -297,27 +297,7 @@ void RefreshOwnFromRepo(QNetworkAccessManager *manager, bool fresh) {
 }
 
 void RefreshOwn(QNetworkAccessManager *manager, bool fresh = false) {
-	auto request = QNetworkRequest(QUrl(u"https://exdesktop.xyz/api/badges"_q));
-	request.setRawHeader("User-Agent", "exDesktop");
-	request.setAttribute(
-		QNetworkRequest::CacheLoadControlAttribute,
-		QNetworkRequest::AlwaysNetwork);
-	request.setTransferTimeout(10000);
-	const auto reply = manager->get(request);
-	QObject::connect(reply, &QNetworkReply::finished, [=] {
-		reply->deleteLater();
-		const auto bytes = (reply->error() == QNetworkReply::NoError)
-			? reply->readAll()
-			: QByteArray();
-		if (!bytes.isEmpty() && ApplyOwn(bytes)) {
-			auto file = QFile(OwnCachePath());
-			if (file.open(QIODevice::WriteOnly)) {
-				file.write(bytes);
-			}
-			return;
-		}
-		RefreshOwnFromRepo(manager, fresh);
-	});
+	RefreshOwnFromRepo(manager, fresh);
 }
 
 [[nodiscard]] uint64 BareId(not_null<PeerData*> peer) {

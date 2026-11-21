@@ -456,8 +456,8 @@ void Score(Report &report, const VectorStats &stats, const QString &entropy) {
 
 [[nodiscard]] QString SystemPrompt() {
 	const auto russian = Lang::Id().startsWith(u"ru"_q);
-	return u"You are an expert security arbiter for exDesktop plugins. "
-		"exDesktop is a Telegram Desktop client that runs Python plugins "
+	return u"You are an expert security arbiter for MoltenGram Desktop plugins. "
+		"MoltenGram Desktop is a Telegram Desktop client that runs Python plugins "
 		"compatible with exteraGram. You receive static findings, network "
 		"endpoints, vector similarity results and a slice of the plugin "
 		"code. Separate legitimate functionality from real threats.\n"

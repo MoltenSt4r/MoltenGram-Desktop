@@ -101,7 +101,7 @@ void Open(const QString &payload) {
 	const auto requestedBase = data.value(u"base_url"_q).toString();
 	const auto baseUrl = (!netOffPrefetch && requestedBase.startsWith(u"https://"_q))
 		? requestedBase
-		: u"https://plugin.exdesktop.local/"_q;
+		: u"https://plugin.moltengram.local/"_q;
 	const auto width = std::clamp(data.value(u"width"_q).toInt(420), 240, 1600);
 	const auto height = std::clamp(data.value(u"height"_q).toInt(640), 200, 1200);
 	const auto interfaces = data.value(u"interfaces"_q).toArray();

@@ -48,11 +48,11 @@ rpl::producer<TextWithEntities> Text2() {
 		lt_gpl_link,
 		rpl::single(tr::link(
 			"GNU GPL",
-			"https://github.com/metawka/exDesktop/blob/main/LICENSE")),
+			"https://github.com/MoltenSt4r/MoltenGram-Desktop/blob/main/LICENSE")),
 		lt_github_link,
 		rpl::single(tr::link(
 			"GitHub",
-			"https://github.com/metawka/exDesktop")),
+			"https://github.com/MoltenSt4r/MoltenGram-Desktop")),
 		tr::marked);
 }
 
@@ -60,12 +60,12 @@ rpl::producer<TextWithEntities> Text3() {
 	return tr::lng_exd_about_links(
 		lt_site_link,
 		rpl::single(tr::link(
-			"exteradesktop.xyz",
-			"https://exteradesktop.xyz")),
+			"moltenstar.space",
+			"https://www.moltenstar.space")),
 		lt_channel_link,
-		rpl::single(tr::link("@exDesktop", "https://t.me/exDesktop")),
+		rpl::single(tr::link("@MoltenGram", "https://t.me/MoltenGram")),
 		lt_chat_link,
-		rpl::single(tr::link("@exDesktopChat", "https://t.me/exDesktopChat")),
+		rpl::single(tr::link("@MoltenGramBot", "https://t.me/MoltenGramBot")),
 		tr::marked);
 }
 

@@ -177,25 +177,25 @@ jobs:
           fi
           test -f "$APP/Contents/Resources/python/extera/extera_host.py"
           test -d "$APP/Contents/Resources/python/site-packages/requests"
-          rm -rf exDesktop.app
-          mv "$APP" exDesktop.app
-          codesign --force --deep --sign - exDesktop.app
-          codesign --verify --deep --strict exDesktop.app
-          ditto -c -k --sequesterRsrc --keepParent exDesktop.app \
-            "$GITHUB_WORKSPACE/exDesktop-macos-${{ matrix.name }}.$VERSION.zip"
+          rm -rf MoltenGram-Desktop.app
+          mv "$APP" MoltenGram-Desktop.app
+          codesign --force --deep --sign - MoltenGram-Desktop.app
+          codesign --verify --deep --strict MoltenGram-Desktop.app
+          ditto -c -k --sequesterRsrc --keepParent MoltenGram-Desktop.app \
+            "$GITHUB_WORKSPACE/MoltenGram-Desktop-macos-${{ matrix.name }}.$VERSION.zip"
           mkdir -p dmg
-          ditto exDesktop.app dmg/exDesktop.app
+          ditto MoltenGram-Desktop.app dmg/MoltenGram-Desktop.app
           ln -s /Applications dmg/Applications
-          hdiutil create -volname exDesktop -srcfolder dmg -ov -format UDZO \
-            "$GITHUB_WORKSPACE/exDesktop-macos-${{ matrix.name }}.$VERSION.dmg"
+          hdiutil create -volname "MoltenGram Desktop" -srcfolder dmg -ov -format UDZO \
+            "$GITHUB_WORKSPACE/MoltenGram-Desktop-macos-${{ matrix.name }}.$VERSION.dmg"
 
       - name: Upload build artifact
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: exDesktop-macos-${{ matrix.name }}
+          name: MoltenGram-Desktop-macos-${{ matrix.name }}
           path: |
-            exDesktop-macos-${{ matrix.name }}.*.zip
-            exDesktop-macos-${{ matrix.name }}.*.dmg
+            MoltenGram-Desktop-macos-${{ matrix.name }}.*.zip
+            MoltenGram-Desktop-macos-${{ matrix.name }}.*.dmg
           retention-days: 7
 
       - name: Attach to release
@@ -204,5 +204,5 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           gh release upload "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" \
-            "exDesktop-macos-${{ matrix.name }}.$VERSION.zip" \
-            "exDesktop-macos-${{ matrix.name }}.$VERSION.dmg" --clobber
+            "MoltenGram-Desktop-macos-${{ matrix.name }}.$VERSION.zip" \
+            "MoltenGram-Desktop-macos-${{ matrix.name }}.$VERSION.dmg" --clobber

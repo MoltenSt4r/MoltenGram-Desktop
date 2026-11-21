@@ -973,8 +973,8 @@ void AddSupportSteps(not_null<Ui::GenericBox*> box) {
 		tr::lng_exd_support_step1_text(
 			lt_link,
 			rpl::single(Ui::Text::Link(
-				u"@exDesktop_bot"_q,
-				u"https://t.me/exDesktop_bot?start=support"_q)),
+				u"@MoltenGramBot"_q,
+				u"https://t.me/MoltenGramBot?start=support"_q)),
 			tr::marked));
 	step(
 		&st::menuIconPhoto,
@@ -982,8 +982,8 @@ void AddSupportSteps(not_null<Ui::GenericBox*> box) {
 		tr::lng_exd_support_step2_text(
 			lt_user,
 			rpl::single(Ui::Text::Link(
-				u"@exDesktop_bot"_q,
-				u"https://t.me/exDesktop_bot?start=support"_q)),
+				u"@MoltenGramBot"_q,
+				u"https://t.me/MoltenGramBot?start=support"_q)),
 			tr::marked));
 	step(
 		&st::menuIconPremium,
@@ -1091,7 +1091,7 @@ void ShowBadgeInfoBox(not_null<Window::SessionController*> controller) {
 
 		box->addButton(tr::lng_exd_badge_contact(), [=] {
 			UrlClickHandler::Open(
-				u"https://t.me/exDesktop_bot?start=support"_q);
+				u"https://t.me/MoltenGramBot?start=support"_q);
 			box->closeBox();
 		});
 	}));
@@ -3021,29 +3021,29 @@ void PartMain2(SectionBuilder &builder) {
 			builder,
 			u"developer"_q,
 			tr::lng_extera_port_developer(),
-			u"@metawka"_q,
-			u"https://t.me/metawka"_q,
+			u"MoltenSt4r"_q,
+			u"https://github.com/MoltenSt4r"_q,
 			{ &st::exteraIconDeveloper });
 		AddLink(
 			builder,
 			u"channel"_q,
 			tr::lng_extera_channel(),
-			u"@exDesktop"_q,
-			u"https://t.me/exDesktop"_q,
+			u"@MoltenGram"_q,
+			u"https://t.me/MoltenGram"_q,
 			{ &st::exteraIconChannel });
 		AddLink(
 			builder,
 			u"forum"_q,
 			tr::lng_extera_forum(),
-			u"@exDesktopChat"_q,
-			u"https://t.me/exDesktopChat"_q,
+			u"@MoltenGramBot"_q,
+			u"https://t.me/MoltenGramBot"_q,
 			{ &st::exteraIconForum });
 		AddLink(
 			builder,
 			u"website"_q,
 			tr::lng_extera_website(),
-			u"exteradesktop.xyz"_q,
-			u"https://exteradesktop.xyz"_q,
+			u"moltenstar.space"_q,
+			u"https://www.moltenstar.space"_q,
 			{ &st::exteraIconWebsite });
 	});
 }
@@ -3845,7 +3845,7 @@ void BuildPluginsEngine(SectionBuilder &builder) {
 			u"plugins_docs"_q,
 			tr::lng_extera_plugins_docs(),
 			QString(),
-			u"https://exdesktop.xyz/docs/"_q,
+			u"https://github.com/MoltenSt4r/MoltenGram-Desktop/tree/main/docs/sdk"_q,
 			{ &st::menuIconFaq });
 		for (const auto &source : Extera::PluginTrust::Sources()) {
 			if (source.id == 2189715950ULL
@@ -4861,7 +4861,7 @@ void SendBadgeCommand(
 			Extera::RefreshBadges();
 		});
 	};
-	const auto username = u"exDesktop_bot"_q;
+	const auto username = u"MoltenGramBot"_q;
 	if (const auto bot = session->data().peerByUsername(username)) {
 		send(bot);
 		return;
@@ -5167,7 +5167,7 @@ void ShowExteraBadgeBox(
 				[=] {
 					box->closeBox();
 					UrlClickHandler::Open(
-						u"https://t.me/exDesktop_bot?start=support"_q);
+						u"https://t.me/MoltenGramBot?start=support"_q);
 				});
 		}
 		buttons->widthValue() | rpl::on_next([=](int width) {

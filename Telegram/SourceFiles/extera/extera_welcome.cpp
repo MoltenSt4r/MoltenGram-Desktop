@@ -79,20 +79,20 @@ void FillUnofficialInfo(not_null<Ui::VerticalLayout*> container) {
 	AddLinkButton(
 		container,
 		tr::lng_extera_welcome_site(),
-		u"exteradesktop.xyz"_q,
-		u"https://exteradesktop.xyz"_q,
+		u"moltenstar.space"_q,
+		u"https://www.moltenstar.space"_q,
 		&st::exteraIconWebsite);
 	AddLinkButton(
 		container,
 		tr::lng_extera_welcome_dev(),
-		u"@metawka"_q,
-		u"https://t.me/metawka"_q,
+		u"MoltenSt4r"_q,
+		u"https://github.com/MoltenSt4r"_q,
 		&st::exteraIconDeveloper);
 	AddLinkButton(
 		container,
 		tr::lng_extera_welcome_channel(),
-		u"@exDesktop"_q,
-		u"https://t.me/exDesktop"_q,
+		u"@MoltenGram"_q,
+		u"https://t.me/MoltenGram"_q,
 		&st::exteraIconChannel);
 }
 
@@ -265,26 +265,26 @@ void ShowWelcomeBox(not_null<Window::SessionController*> controller) {
 			AddLinkButton(
 				content,
 				tr::lng_extera_port_developer(),
-				u"@metawka"_q,
-				u"https://t.me/metawka"_q,
+				u"MoltenSt4r"_q,
+				u"https://github.com/MoltenSt4r"_q,
 				&st::exteraIconDeveloper);
 			AddLinkButton(
 				content,
 				tr::lng_extera_channel(),
-				u"@exDesktop"_q,
-				u"https://t.me/exDesktop"_q,
+				u"@MoltenGram"_q,
+				u"https://t.me/MoltenGram"_q,
 				&st::exteraIconChannel);
 			AddLinkButton(
 				content,
 				tr::lng_extera_forum(),
-				u"@exDesktopChat"_q,
-				u"https://t.me/exDesktopChat"_q,
+				u"@MoltenGramBot"_q,
+				u"https://t.me/MoltenGramBot"_q,
 				&st::exteraIconForum);
 			AddLinkButton(
 				content,
 				tr::lng_extera_website(),
-				u"exteradesktop.xyz"_q,
-				u"https://exteradesktop.xyz"_q,
+				u"moltenstar.space"_q,
+				u"https://www.moltenstar.space"_q,
 				&st::exteraIconWebsite);
 			box->addButton(tr::lng_exd_wizard_setup(), [=] {
 				crl::on_main(box, [=] {

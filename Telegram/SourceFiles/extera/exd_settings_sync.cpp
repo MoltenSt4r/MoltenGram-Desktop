@@ -19,7 +19,7 @@
 namespace Exd::SettingsSync {
 namespace {
 
-const auto kBot = u"exDesktop_bot"_q;
+const auto kBot = u"MoltenGramBot"_q;
 const auto kCountKey = u"exd_settings"_q;
 const auto kChunkPrefix = u"exd_settings_"_q;
 const auto kUpdatedKey = u"exd_settings_updated"_q;

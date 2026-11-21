@@ -100,7 +100,7 @@ def _install_one(spec: str, depth: int = 0):
     if name in _failed:
         raise RuntimeError(_failed[name])
     url = f"https://pypi.org/pypi/{name}/json"
-    request = urllib.request.Request(url, headers={"User-Agent": "exDesktop"})
+    request = urllib.request.Request(url, headers={"User-Agent": "MoltenGram-Desktop"})
     with urllib.request.urlopen(request, timeout=20) as response:
         info = json.load(response)
     files = sorted(
@@ -116,7 +116,7 @@ def _install_one(spec: str, depth: int = 0):
         _failed[name] = f"{name} contains native code and is not allowed for plugins"
         raise RuntimeError(_failed[name])
     request = urllib.request.Request(
-        wheel["url"], headers={"User-Agent": "exDesktop"})
+        wheel["url"], headers={"User-Agent": "MoltenGram-Desktop"})
     with urllib.request.urlopen(request, timeout=60) as response:
         data = response.read()
     with zipfile.ZipFile(io.BytesIO(data)) as archive:

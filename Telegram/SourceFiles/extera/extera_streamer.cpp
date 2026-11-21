@@ -789,7 +789,7 @@ void PaintPreview(QPainter &p, QRect rect) {
 	case UsernameMode::Hidden:
 		break;
 	case UsernameMode::Shown:
-		drawText(y, u"@metawka"_q, true);
+		drawText(y, u"@MoltenGram"_q, true);
 		y += line;
 		break;
 	}
@@ -848,7 +848,7 @@ void PaintPreview(QPainter &p, QRect rect) {
 				Avatar(),
 				QRect(left, channelTop, photo, photo));
 		},
-		u"@exDesktop"_q,
+		u"@MoltenGram"_q,
 		tr::lng_extera_streamer_preview_channel(tr::now));
 }
 
@@ -1099,7 +1099,7 @@ ChatHide ForPeer(not_null<PeerData*> peer) {
 }
 
 QString Name() {
-	return u"exDesktop"_q;
+	return u"MoltenGram Desktop"_q;
 }
 
 const QImage &Avatar() {

@@ -1,7 +1,7 @@
 #!/bin/sh
 set -eu
 
-REPO="metawka/exDesktop"
+REPO="MoltenSt4r/MoltenGram-Desktop"
 ASSUME_YES=0
 OPT_MENU=""
 OPT_TGWS=""
@@ -75,18 +75,18 @@ ARCH="$(uname -m)"
 case "$OS" in
 	Linux)
 		[ "$ARCH" = "x86_64" ] || fail "only x86_64 builds are published for Linux" "для Linux публикуются только сборки x86_64"
-		PATTERN='exDesktop-linux-x64\.[0-9.]*\.tar\.gz'
-		[ -n "$PREFIX" ] || PREFIX="$HOME/.local/share/exDesktop/app"
-		DATA_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/exDesktop"
+		PATTERN='MoltenGram-Desktop-linux-x64\.[0-9.]*\.tar\.gz'
+		[ -n "$PREFIX" ] || PREFIX="$HOME/.local/share/MoltenGram-Desktop/app"
+		DATA_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/MoltenGram-Desktop"
 		;;
 	Darwin)
 		if [ "$ARCH" = "arm64" ] || [ "$(sysctl -n hw.optional.arm64 2>/dev/null)" = "1" ]; then
-			PATTERN='exDesktop-macos-arm64\.[0-9.]*\.zip'
+			PATTERN='MoltenGram-Desktop-macos-arm64\.[0-9.]*\.zip'
 		else
-			PATTERN='exDesktop-macos-x64\.[0-9.]*\.zip'
+			PATTERN='MoltenGram-Desktop-macos-x64\.[0-9.]*\.zip'
 		fi
 		[ -n "$PREFIX" ] || PREFIX="/Applications"
-		DATA_DIR="$HOME/Library/Application Support/exDesktop"
+		DATA_DIR="$HOME/Library/Application Support/MoltenGram Desktop"
 		;;
 	*)
 		fail "unsupported system $OS, use the Windows installer from the releases page" "система $OS не поддерживается, для Windows используйте установщик со страницы релизов"
@@ -107,7 +107,7 @@ VERSION="${NAME#*.}"
 say "Version: $VERSION" "Версия: $VERSION"
 
 if [ "$OS" = "Linux" ]; then
-	ask "$OPT_MENU" "Add exDesktop to the application menu?" "Добавить exDesktop в меню приложений?" 1 && OPT_MENU=1 || OPT_MENU=0
+	ask "$OPT_MENU" "Add MoltenGram Desktop to the application menu?" "Добавить MoltenGram Desktop в меню приложений?" 1 && OPT_MENU=1 || OPT_MENU=0
 fi
 ask "$OPT_TGWS" "Install TG WS Proxy dependencies (python3 and pip required)?" "Установить зависимости TG WS Proxy (нужны python3 и pip)?" 1 && OPT_TGWS=1 || OPT_TGWS=0
 ask "$OPT_AYU" "Enable AyuGram features (ghost mode, saving deleted messages)?" "Включить функции AyuGram (режим призрака, сохранение удалённых сообщений)?" 0 && OPT_AYU=1 || OPT_AYU=0
@@ -131,36 +131,36 @@ fi
 if [ "$OS" = "Linux" ]; then
 	mkdir -p "$TMP/unpack"
 	tar -xzf "$FILE" -C "$TMP/unpack"
-	[ -x "$TMP/unpack/exDesktop/exDesktop" ] || fail "archive is damaged" "архив повреждён"
+	[ -x "$TMP/unpack/MoltenGram-Desktop/MoltenGram-Desktop" ] || fail "archive is damaged" "архив повреждён"
 	rm -rf "$PREFIX"
 	mkdir -p "$(dirname "$PREFIX")"
-	mv "$TMP/unpack/exDesktop" "$PREFIX"
+	mv "$TMP/unpack/MoltenGram-Desktop" "$PREFIX"
 	TGWS_DIR="$PREFIX/python/tgws"
 	mkdir -p "$HOME/.local/bin"
-	ln -sf "$PREFIX/exDesktop" "$HOME/.local/bin/exdesktop"
+	ln -sf "$PREFIX/MoltenGram-Desktop" "$HOME/.local/bin/moltengram-desktop"
 	if [ "$OPT_MENU" = 1 ]; then
 		APPS="${XDG_DATA_HOME:-$HOME/.local/share}/applications"
 		ICONS="${XDG_DATA_HOME:-$HOME/.local/share}/icons/hicolor/256x256/apps"
 		MIME="${XDG_DATA_HOME:-$HOME/.local/share}/mime/packages"
 		mkdir -p "$APPS" "$ICONS" "$MIME"
-		[ -f "$PREFIX/exDesktop.png" ] && cp "$PREFIX/exDesktop.png" "$ICONS/exdesktop.png"
-		cat > "$APPS/exdesktop.desktop" <<EOF
+		[ -f "$PREFIX/MoltenGram-Desktop.png" ] && cp "$PREFIX/MoltenGram-Desktop.png" "$ICONS/moltengram-desktop.png"
+		cat > "$APPS/moltengram-desktop.desktop" <<EOF
 [Desktop Entry]
 Type=Application
-Name=exDesktop
+Name=MoltenGram Desktop
 Comment=Telegram client
-Exec="$PREFIX/exDesktop" -- %u
-Icon=exdesktop
+Exec="$PREFIX/MoltenGram-Desktop" -- %u
+Icon=moltengram-desktop
 Terminal=false
 Categories=Network;InstantMessaging;Chat;
-MimeType=x-scheme-handler/tg;application/x-exdesktop-plugin;
-StartupWMClass=exDesktop
+MimeType=x-scheme-handler/tg;application/x-moltengram-plugin;
+StartupWMClass=MoltenGram Desktop
 EOF
-		cat > "$MIME/exdesktop-plugin.xml" <<EOF
+		cat > "$MIME/moltengram-plugin.xml" <<EOF
 <?xml version="1.0" encoding="UTF-8"?>
 <mime-info xmlns="http://www.freedesktop.org/standards/shared-mime-info">
-  <mime-type type="application/x-exdesktop-plugin">
-    <comment>exDesktop plugin</comment>
+  <mime-type type="application/x-moltengram-plugin">
+    <comment>MoltenGram Desktop plugin</comment>
     <glob pattern="*.plugin"/>
   </mime-type>
 </mime-info>
@@ -172,15 +172,15 @@ else
 	command -v ditto >/dev/null 2>&1 || fail "ditto is required" "нужна утилита ditto"
 	mkdir -p "$TMP/unpack"
 	ditto -x -k "$FILE" "$TMP/unpack"
-	[ -d "$TMP/unpack/exDesktop.app" ] || fail "archive is damaged" "архив повреждён"
-	TARGET="$PREFIX/exDesktop.app"
+	[ -d "$TMP/unpack/MoltenGram-Desktop.app" ] || fail "archive is damaged" "архив повреждён"
+	TARGET="$PREFIX/MoltenGram-Desktop.app"
 	if [ ! -w "$PREFIX" ]; then
 		PREFIX="$HOME/Applications"
-		TARGET="$PREFIX/exDesktop.app"
+		TARGET="$PREFIX/MoltenGram-Desktop.app"
 		mkdir -p "$PREFIX"
 	fi
 	rm -rf "$TARGET"
-	ditto "$TMP/unpack/exDesktop.app" "$TARGET"
+	ditto "$TMP/unpack/MoltenGram-Desktop.app" "$TARGET"
 	xattr -dr com.apple.quarantine "$TARGET" 2>/dev/null || true
 	TGWS_DIR="$DATA_DIR/tgws-lib"
 fi
@@ -201,7 +201,7 @@ mkdir -p "$DATA_DIR"
 printf 'ayu=%s\ntgws=%s\n' "$OPT_AYU" "$OPT_TGWS" > "$DATA_DIR/exd_install.conf"
 
 if [ "$OS" = "Linux" ]; then
-	say "exDesktop $VERSION is installed to $PREFIX. Run: exdesktop" "exDesktop $VERSION установлен в $PREFIX. Запуск: exdesktop"
+	say "MoltenGram Desktop $VERSION is installed to $PREFIX. Run: moltengram-desktop" "MoltenGram Desktop $VERSION установлен в $PREFIX. Запуск: moltengram-desktop"
 else
-	say "exDesktop $VERSION is installed to $TARGET" "exDesktop $VERSION установлен в $TARGET"
+	say "MoltenGram Desktop $VERSION is installed to $TARGET" "MoltenGram Desktop $VERSION установлен в $TARGET"
 fi

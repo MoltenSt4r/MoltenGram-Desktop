@@ -142,7 +142,7 @@ void ShowUpdateBox(not_null<Window::SessionController*> controller) {
 		texts->add(
 			object_ptr<Ui::FlatLabel>(
 				texts,
-				rpl::single(u"exDesktop"_q),
+				rpl::single(u"MoltenGram Desktop"_q),
 				st::exdSideTitle),
 			style::margins());
 		texts->add(

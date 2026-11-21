@@ -199,11 +199,11 @@ private:
 	if (QFile::exists(appData + u"extera/extera_host.py"_q)) {
 		return appData;
 	}
-	const auto localShare = QDir::homePath() + u"/.local/share/exDesktop/python/"_q;
+	const auto localShare = QDir::homePath() + u"/.local/share/MoltenGram-Desktop/python/"_q;
 	if (QFile::exists(localShare + u"extera/extera_host.py"_q)) {
 		return localShare;
 	}
-	const auto systemShare = u"/usr/share/exDesktop/python/"_q;
+	const auto systemShare = u"/usr/share/MoltenGram-Desktop/python/"_q;
 	if (QFile::exists(systemShare + u"extera/extera_host.py"_q)) {
 		return systemShare;
 	}
@@ -943,7 +943,7 @@ PyObject *NativeSbxPush(PyObject *self, PyObject *args) {
 	}
 	const auto value = QString::fromUtf8(owner);
 	if (value.isEmpty()) {
-		PyErr_SetString(SandboxPermissionError, "exDesktop sandbox: invalid owner");
+		PyErr_SetString(SandboxPermissionError, "MoltenGram Desktop sandbox: invalid owner");
 		return nullptr;
 	}
 	const auto token = SandboxToken();
@@ -1004,7 +1004,7 @@ PyObject *NativeSbxThreadEntry(PyObject *self, PyObject *args) {
 
 PyObject *SandboxGuardedCall(const char *event, PyObject *real, PyObject *args) {
 	if (!real) {
-		PyErr_SetString(SandboxPermissionError, "exDesktop sandbox: not available");
+		PyErr_SetString(SandboxPermissionError, "MoltenGram Desktop sandbox: not available");
 		return nullptr;
 	}
 	if (SandboxDepth == 0) {

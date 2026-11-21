@@ -137,7 +137,7 @@ void Download(bool install) {
 		state.manager = new QNetworkAccessManager(qApp);
 	}
 	auto request = QNetworkRequest(QUrl(state.assetUrl));
-	request.setRawHeader("User-Agent", "exDesktop");
+	request.setRawHeader("User-Agent", "MoltenGram-Desktop");
 	request.setAttribute(
 		QNetworkRequest::RedirectPolicyAttribute,
 		QNetworkRequest::NoLessSafeRedirectPolicy);
@@ -169,7 +169,7 @@ void Download(bool install) {
 			return;
 		}
 		const auto folder = QDir::tempPath()
-			+ u"/exDesktop/update/"_q
+			+ u"/MoltenGram-Desktop/update/"_q
 			+ QUuid::createUuid().toString(QUuid::WithoutBraces);
 		QDir().mkpath(folder);
 		const auto path = folder + '/' + state.assetName;
@@ -208,7 +208,7 @@ void Apply(const QJsonObject &object, Fn<void(CheckResult)> done) {
 	state.prerelease = object.value(u"prerelease"_q).toBool();
 	const auto page = object.value(u"html_url"_q).toString();
 	state.url = page.startsWith(
-		u"https://github.com/metawka/exDesktop/"_q)
+		u"https://github.com/MoltenSt4r/MoltenGram-Desktop/"_q)
 		? page
 		: QString();
 	state.assetUrl = QString();
@@ -219,12 +219,12 @@ void Apply(const QJsonObject &object, Fn<void(CheckResult)> done) {
 		const auto name = info.value(u"name"_q).toString();
 		const auto url = info.value(u"browser_download_url"_q).toString();
 		const auto digest = info.value(u"digest"_q).toString();
-		if (name.startsWith(u"exDesktop-setup-x64"_q)
+		if (name.startsWith(u"MoltenGram-Desktop-setup-x64"_q)
 			&& name.endsWith(u".exe"_q)
 			&& !name.contains('/')
 			&& !name.contains('\\')
 			&& url.startsWith(
-				u"https://github.com/metawka/exDesktop/releases/download/"_q)
+				u"https://github.com/MoltenSt4r/MoltenGram-Desktop/releases/download/"_q)
 			&& digest.startsWith(u"sha256:"_q)) {
 			state.assetName = name;
 			state.assetUrl = url;
@@ -253,10 +253,10 @@ void Check(Fn<void(CheckResult)> done = nullptr) {
 	}
 	const auto beta = Extera::Bool(u"exd_update_beta"_q);
 	auto request = QNetworkRequest(QUrl(beta
-		? u"https://api.github.com/repos/metawka/exDesktop/releases?per_page=10"_q
-		: u"https://api.github.com/repos/metawka/exDesktop/releases/latest"_q));
+		? u"https://api.github.com/repos/MoltenSt4r/MoltenGram-Desktop/releases?per_page=10"_q
+		: u"https://api.github.com/repos/MoltenSt4r/MoltenGram-Desktop/releases/latest"_q));
 	request.setRawHeader("Accept", "application/vnd.github+json");
-	request.setRawHeader("User-Agent", "exDesktop");
+	request.setRawHeader("User-Agent", "MoltenGram-Desktop");
 	const auto reply = state.manager->get(request);
 	QObject::connect(reply, &QNetworkReply::finished, [=] {
 		reply->deleteLater();
@@ -356,13 +356,13 @@ void Skip() {
 }
 
 void OpenAllReleases() {
-	UrlClickHandler::Open(u"https://github.com/metawka/exDesktop/releases"_q);
+	UrlClickHandler::Open(u"https://github.com/MoltenSt4r/MoltenGram-Desktop/releases"_q);
 }
 
 void OpenRelease() {
 	const auto &url = Instance().url;
 	UrlClickHandler::Open(url.isEmpty()
-		? u"https://github.com/metawka/exDesktop/releases/latest"_q
+		? u"https://github.com/MoltenSt4r/MoltenGram-Desktop/releases/latest"_q
 		: url);
 }
 

@@ -1,0 +1,175 @@
+name: Windows build
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    timeout-minutes: 360
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+          submodules: recursive
+
+      - name: Set up Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: "3.10"
+
+      # prepare.py expects the checkout to be a folder literally named
+      # "tdesktop" sitting right next to Libraries/ThirdParty, same deal
+      # as the macOS workflow.
+      - name: Link checkout as tdesktop
+        shell: cmd
+        run: mklink /J "%GITHUB_WORKSPACE%\..\tdesktop" "%GITHUB_WORKSPACE%"
+
+      - name: Restore ThirdParty libraries
+        id: libs
+        uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: |
+            ${{ github.workspace }}\..\Libraries
+            ${{ github.workspace }}\..\ThirdParty
+          key: win-libs-${{ hashFiles('Telegram/build/prepare/prepare.py', 'Telegram/build/prepare/win.bat') }}
+
+      - name: Install ATL for Breakpad
+        shell: pwsh
+        run: |
+          $installer = Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio\Installer'
+          $vswhere = Join-Path $installer 'vswhere.exe'
+          $setup = Join-Path $installer 'setup.exe'
+          $toolsComponent = 'Microsoft.VisualStudio.Component.VC.14.44.17.14.x86.x64'
+          $atlComponent = 'Microsoft.VisualStudio.Component.VC.14.44.17.14.ATL'
+          $vsPath = @(& $vswhere -latest -products '*' -requires $toolsComponent -property installationPath)[0]
+          if (-not $vsPath) { throw "No Visual Studio instance provides $toolsComponent." }
+
+          $toolset = Get-ChildItem (Join-Path $vsPath 'VC\Tools\MSVC') -Directory |
+            Where-Object { $_.Name -like '14.44.*' } |
+            Sort-Object Name -Descending |
+            Select-Object -First 1
+          if (-not $toolset) { throw "The selected Visual Studio instance has no 14.44 toolset." }
+          $header = Join-Path $toolset.FullName 'atlmfc\include\atlbase.h'
+
+          if (-not (Test-Path $header)) {
+            $process = Start-Process -FilePath $setup -Wait -PassThru -ArgumentList @(
+              'modify', '--installPath', "`"$vsPath`"", '--add', $atlComponent,
+              '--quiet', '--norestart', '--nocache'
+            )
+            if ($process.ExitCode -notin @(0, 3010)) { throw "Visual Studio Installer exited with $($process.ExitCode)." }
+          }
+          if (-not (Test-Path $header)) { throw "ATL for 14.44 was not installed at $header." }
+          "VCVARS64=$vsPath\VC\Auxiliary\Build\vcvars64.bat" >> $env:GITHUB_ENV
+
+      - name: Build ThirdParty libraries
+        shell: cmd
+        run: |
+          call "%VCVARS64%" -vcvars_ver=14.44
+          if not exist "%VCToolsInstallDir%atlmfc\include\atlbase.h" (echo ATL for selected toolset is missing & exit /b 1)
+          echo %INCLUDE% | findstr /I /C:"%VCToolsInstallDir%atlmfc\include" >nul || (echo ATL include path is missing from INCLUDE & exit /b 1)
+          Telegram\build\prepare\win.bat silent
+
+      - name: Save ThirdParty libraries
+        if: steps.libs.outputs.cache-hit != 'true'
+        uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: |
+            ${{ github.workspace }}\..\Libraries
+            ${{ github.workspace }}\..\ThirdParty
+          key: ${{ steps.libs.outputs.cache-primary-key }}
+
+      # Plugin engine links against an embedded Python 3.11, expected at
+      # Libraries/win64/python311 with include/, libs/python311.lib and embed/.
+      - name: Fetch embedded Python 3.11
+        shell: pwsh
+        run: |
+          $dest = Join-Path (Split-Path $env:GITHUB_WORKSPACE) "Libraries\win64\python311"
+          New-Item -ItemType Directory -Force $dest | Out-Null
+          Invoke-WebRequest "https://www.python.org/ftp/python/3.11.9/python-3.11.9-embed-amd64.zip" -OutFile embed.zip
+          Expand-Archive embed.zip "$dest\embed" -Force
+          Invoke-WebRequest "https://www.nuget.org/api/v2/package/python/3.11.9" -OutFile python.nupkg.zip
+          Expand-Archive python.nupkg.zip nuget -Force
+          Copy-Item nuget\tools\include "$dest\include" -Recurse -Force
+          Copy-Item nuget\tools\libs "$dest\libs" -Recurse -Force
+
+      - name: Install Inno Setup
+        shell: pwsh
+        run: choco install innosetup --yes --no-progress
+
+      # -vcvars_ver=14.44 is what docs/building-win.md pins for Windows 7
+      # support. If a runner's VS install doesn't ship that exact toolset
+      # this will fail and needs adjusting to whatever is actually there.
+      - name: Configure and build
+        shell: cmd
+        env:
+          API_ID: ${{ secrets.TDESKTOP_API_ID }}
+          API_HASH: ${{ secrets.TDESKTOP_API_HASH }}
+        run: |
+          call "%VCVARS64%" -vcvars_ver=14.44
+          set "CREDS=-D TDESKTOP_API_ID=%API_ID% -D TDESKTOP_API_HASH=%API_HASH%"
+          if "%API_ID%"=="" (
+            if "%GITHUB_EVENT_NAME%"=="release" (echo TDESKTOP_API_ID secret is not set & exit /b 1)
+            echo No API secrets, using TEST ONLY credentials
+            set "CREDS=-D TDESKTOP_API_TEST=ON"
+          )
+          cd Telegram
+          call configure.bat x64 %CREDS%
+          cd ..\out
+          msbuild Telegram.slnx /t:Telegram /p:Configuration=Release /m
+
+      - name: Package
+        shell: pwsh
+        run: |
+          $release = Join-Path $env:GITHUB_WORKSPACE 'out\Release'
+          $versionHeader = Get-Content 'Telegram\SourceFiles\core\version.h' -Raw
+          if ($versionHeader -notmatch 'AppVersionStr\s*=\s*"([^"]+)"') { throw 'AppVersionStr was not found' }
+          $version = $Matches[1]
+          $packageVersion = $version
+          if ($env:GITHUB_EVENT_NAME -eq 'release') { $packageVersion = $env:GITHUB_REF_NAME.TrimStart('v') }
+          $portable = Join-Path $env:GITHUB_WORKSPACE 'MoltenGram-Desktop-windows-x64'
+          New-Item -ItemType Directory -Path $portable -Force | Out-Null
+          Copy-Item (Join-Path $release 'Telegram.exe') $portable
+          Copy-Item (Join-Path $release 'python') $portable -Recurse
+          Copy-Item (Join-Path $release 'modules') $portable -Recurse
+          if (Test-Path (Join-Path $release 'Updater.exe')) { Copy-Item (Join-Path $release 'Updater.exe') $portable }
+          $portableZip = "MoltenGram-Desktop-portable-x64.$packageVersion.zip"
+          Compress-Archive -Path (Join-Path $portable '*') -DestinationPath (Join-Path $env:GITHUB_WORKSPACE $portableZip) -Force
+          $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+          $setup = Join-Path $env:GITHUB_WORKSPACE 'Telegram\build\setup.iss'
+          $setupArgs = @(
+            '/dSkipSign',
+            "/dMyAppVersion=$version",
+            "/dMyAppVersionZero=$version.0",
+            "/dMyAppVersionFull=$packageVersion",
+            "/dMyOutputBaseFilename=MoltenGram-Desktop-setup-x64.$packageVersion",
+            "/dReleasePath=$release",
+            '/dMyBuildTarget=win64',
+            $setup
+          )
+          & $iscc @setupArgs
+          if ($LASTEXITCODE -ne 0) { throw 'Inno Setup failed' }
+          "BUILD_VERSION=$packageVersion" >> $env:GITHUB_ENV
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: MoltenGram-Desktop-windows-x64
+          path: |
+            MoltenGram-Desktop-portable-x64.*.zip
+            out/Release/MoltenGram-Desktop-setup-x64.*.exe
+          retention-days: 7
+
+      - name: Attach to release
+        if: github.event_name == 'release'
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        run: gh release upload "$env:RELEASE_TAG" --repo "$env:GITHUB_REPOSITORY" "MoltenGram-Desktop-portable-x64.$env:BUILD_VERSION.zip" "out\Release\MoltenGram-Desktop-setup-x64.$env:BUILD_VERSION.exe" --clobber

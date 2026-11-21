@@ -402,7 +402,7 @@ void BuildSectionButtons(SectionBuilder &builder) {
 		.title = tr::lng_extera_title(),
 		.icon = { &st::exteraIconLogo },
 		.onClick = [=] { showOther(ExteraId()); },
-		.keywords = { u"exdesktop"_q },
+		.keywords = { u"moltengram"_q, u"extera"_q },
 	});
 	if (Extera::Bool(u"ai_chat_main"_q)) {
 		const auto ai = builder.addButton({

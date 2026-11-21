@@ -21,10 +21,10 @@ jobs:
         run: |
           VERSION="${TAG#v}"
           gh release download "$TAG" --repo "$GITHUB_REPOSITORY" \
-            --pattern "exDesktop-macos-arm64.$VERSION.zip"
-          ditto -x -k "exDesktop-macos-arm64.$VERSION.zip" dmg
+            --pattern "MoltenGram-Desktop-macos-arm64.$VERSION.zip"
+          ditto -x -k "MoltenGram-Desktop-macos-arm64.$VERSION.zip" dmg
           ln -s /Applications dmg/Applications
-          hdiutil create -volname exDesktop -srcfolder dmg -ov -format UDZO \
-            "exDesktop-macos-arm64.$VERSION.dmg"
+          hdiutil create -volname "MoltenGram Desktop" -srcfolder dmg -ov -format UDZO \
+            "MoltenGram-Desktop-macos-arm64.$VERSION.dmg"
           gh release upload "$TAG" --repo "$GITHUB_REPOSITORY" \
-            "exDesktop-macos-arm64.$VERSION.dmg" --clobber
+            "MoltenGram-Desktop-macos-arm64.$VERSION.dmg" --clobber

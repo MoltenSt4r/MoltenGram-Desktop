@@ -60,11 +60,11 @@ BEGIN
     BEGIN
         BLOCK "040904b0"
         BEGIN
-            VALUE "CompanyName", "Telegram FZ-LLC"
-            VALUE "FileDescription", "exDesktop"
+            VALUE "CompanyName", "MoltenSt4r"
+            VALUE "FileDescription", "MoltenGram Desktop"
             VALUE "FileVersion", "7.4.4.1"
             VALUE "LegalCopyright", "Copyright (C) 2014-2026"
-            VALUE "ProductName", "exDesktop"
+            VALUE "ProductName", "MoltenGram Desktop"
             VALUE "ProductVersion", "7.4.4.1"
         END
     END

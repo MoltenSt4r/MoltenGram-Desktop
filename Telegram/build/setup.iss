@@ -1,9 +1,9 @@
-﻿#define MyAppShortName "exDesktop"
-#define MyAppName "exDesktop"
-#define MyAppPublisher "exDesktop"
-#define MyAppURL "https://exteradesktop.xyz"
+﻿#define MyAppShortName "MoltenGram Desktop"
+#define MyAppName "MoltenGram Desktop"
+#define MyAppPublisher "MoltenSt4r"
+#define MyAppURL "https://www.moltenstar.space"
 #define MyAppExeName "Telegram.exe"
-#define MyAppId "7D324782-E0D8-4A3C-BCF8-ECABD916542F"
+#define MyAppId "D492BA24-C5AF-4CC5-8948-654F61BC2F50"
 #define CurrentYear GetDateTimeString('yyyy','','')
 
 [Setup]
