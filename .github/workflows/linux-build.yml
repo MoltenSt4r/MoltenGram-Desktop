@@ -41,11 +41,13 @@ jobs:
         uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
 
       - name: Libraries cache
-        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
         with:
           path: ${{ runner.temp }}/.buildx-cache
-          key: ${{ runner.os }}-libs-${{ hashFiles('Telegram/build/docker/centos_env/**') }}
-          restore-keys: ${{ runner.os }}-libs-
+          key: ${{ runner.os }}-libs-${{ hashFiles('Telegram/build/docker/centos_env/**') }}-${{ github.run_id }}
+          restore-keys: |
+            ${{ runner.os }}-libs-${{ hashFiles('Telegram/build/docker/centos_env/**') }}-
+            ${{ runner.os }}-libs-
 
       - name: Libraries
         uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
@@ -61,8 +63,15 @@ jobs:
           rm -rf ${{ runner.temp }}/.buildx-cache
           mv ${{ runner.temp }}/.buildx-cache-new ${{ runner.temp }}/.buildx-cache
 
+      - name: Save Libraries cache
+        if: always()
+        uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: ${{ runner.temp }}/.buildx-cache
+          key: ${{ runner.os }}-libs-${{ hashFiles('Telegram/build/docker/centos_env/**') }}-${{ github.run_id }}
+
       - name: Compiler cache
-        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
         with:
           path: ${{ runner.temp }}/ccache
           key: ${{ runner.os }}-ccache-${{ github.sha }}
@@ -100,6 +109,13 @@ jobs:
               -D DESKTOP_APP_DISABLE_CRASH_REPORTS=ON \
               -D Python3_EXECUTABLE=/usr/bin/python3.11'
           test -f out/Release/Telegram
+
+      - name: Save Compiler cache
+        if: always()
+        uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: ${{ runner.temp }}/ccache
+          key: ${{ runner.os }}-ccache-${{ github.sha }}-${{ github.run_id }}
 
       - name: Python packages
         run: |
