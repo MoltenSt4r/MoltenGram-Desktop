@@ -1438,7 +1438,7 @@ void TopBarWidget::updateControlsGeometry() {
 		_rightTaken += _search->width() + st::topBarCallSkip;
 	}
 	if (_pillStack) {
-		const auto showPills = Extera::PillStack::IsEnabled()
+		const auto showPills = Extera::PillStack::Enabled()
 			&& !hasSelected
 			&& !_searchMode
 			&& (width() - _leftTaken - _rightTaken > 260);

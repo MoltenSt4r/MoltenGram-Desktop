@@ -1764,7 +1764,7 @@ SessionController::SessionController(
 	_chatStyleTheme = _defaultChatTheme;
 	_chatStyle->apply(_defaultChatTheme.get());
 	Exd::SettingsSync::Start(session);
-	Extera::NowPlaying::Service::Instance();
+	Extera::NowPlaying::Service::Instance().init(session);
 
 	pushDefaultChatBackground();
 	Theme::Background()->updates(
