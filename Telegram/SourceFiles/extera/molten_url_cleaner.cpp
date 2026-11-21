@@ -1,7 +1,7 @@
 #include "extera/molten_url_cleaner.h"
 
 #include "extera/extera_config.h"
-#include "chat_helpers/compose/compose_show.h"
+#include "ui/layers/show.h"
 #include "ui/text/text_entity.h"
 #include "ui/toast/toast.h"
 
@@ -253,7 +253,7 @@ TextWithEntities WrapColored(const QString &text, const QColor &color) {
 
 void HandleColorUrlClick(
 		const QString &url,
-		std::shared_ptr<ChatHelpers::Show> show) {
+		std::shared_ptr<Ui::Show> show) {
 	const auto color = ParseColor(url);
 	if (!color || !color->isValid()) {
 		return;

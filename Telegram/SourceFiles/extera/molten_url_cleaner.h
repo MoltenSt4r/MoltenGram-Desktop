@@ -5,9 +5,9 @@
 #include <memory>
 #include <optional>
 
-namespace ChatHelpers {
+namespace Ui {
 class Show;
-} // namespace ChatHelpers
+} // namespace Ui
 
 struct TextWithEntities;
 
@@ -31,6 +31,6 @@ namespace Extera::ColoredText {
 	const QColor &color);
 void HandleColorUrlClick(
 	const QString &url,
-	std::shared_ptr<ChatHelpers::Show> show);
+	std::shared_ptr<Ui::Show> show);
 
 } // namespace Extera::ColoredText
