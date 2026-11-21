@@ -74,8 +74,14 @@ jobs:
           API_HASH: ${{ secrets.TDESKTOP_API_HASH }}
         run: |
           if [ -z "$API_ID" ] || [ -z "$API_HASH" ]; then
-            echo "TDESKTOP_API_ID or TDESKTOP_API_HASH secret is not set"
-            exit 1
+            if [ "$GITHUB_EVENT_NAME" = "release" ]; then
+              echo "TDESKTOP_API_ID or TDESKTOP_API_HASH secret is not set"
+              exit 1
+            fi
+            echo "No API secrets, using TEST ONLY credentials"
+            CREDS_ARGS="-D TDESKTOP_API_TEST=ON"
+          else
+            CREDS_ARGS="-D TDESKTOP_API_ID=$API_ID -D TDESKTOP_API_HASH=$API_HASH"
           fi
           mkdir -p "${{ runner.temp }}/ccache"
           docker run --rm \
@@ -85,12 +91,11 @@ jobs:
             -e CCACHE_DIR=/var/cache/ccache \
             -e CCACHE_SLOPPINESS=pch_defines,time_macros,include_file_mtime,include_file_ctime \
             -e CONFIG=Release \
-            -e API_ID -e API_HASH \
+            -e CREDS_ARGS="$CREDS_ARGS" \
             "$IMAGE_TAG" \
             bash -c '/usr/src/tdesktop/Telegram/build/docker/centos_env/build.sh \
               -D CMAKE_CONFIGURATION_TYPES=Release \
-              -D TDESKTOP_API_ID="$API_ID" \
-              -D TDESKTOP_API_HASH="$API_HASH" \
+              $CREDS_ARGS \
               -D DESKTOP_APP_DISABLE_AUTOUPDATE=ON \
               -D DESKTOP_APP_DISABLE_CRASH_REPORTS=ON \
               -D Python3_EXECUTABLE=/usr/bin/python3.11'
