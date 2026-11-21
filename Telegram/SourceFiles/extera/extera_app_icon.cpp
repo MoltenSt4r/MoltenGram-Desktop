@@ -8,8 +8,10 @@
 #include "window/main_window.h"
 
 #include <QtCore/QBuffer>
+#include <QtCore/QHash>
 #include <QtCore/QSettings>
 #include <QtCore/QStandardPaths>
+#include <QtGui/QPainterPath>
 
 #ifdef Q_OS_WIN
 #include <shlobj.h>
@@ -161,26 +163,47 @@ void UpdatePinned(const QString &icon) {
 std::vector<Variant> Variants() {
 	const auto accent = AccentColor();
 	return {
-		{ QString(), QColor(233, 89, 51), QColor(251, 123, 119), Qt::white },
 		{
-			u"telegram"_q,
-			QColor(34, 135, 203),
-			QColor(85, 190, 240),
-			Qt::white,
-		},
-		{ u"accent"_q, accent, Lighter(accent, 0.35), Qt::white },
-		{
-			u"dark"_q,
-			QColor(28, 28, 32),
-			QColor(58, 58, 66),
-			QColor(251, 124, 116),
-		},
-		{
-			u"light"_q,
-			QColor(240, 240, 244),
-			QColor(255, 255, 255),
+			QString(),
 			QColor(233, 89, 51),
+			QColor(251, 123, 119),
+			Qt::white,
+			u"Classic"_q,
+			u":/gui/art/molten_icons/classic.png"_q,
 		},
+		{
+			u"accent"_q,
+			accent,
+			Lighter(accent, 0.35),
+			Qt::white,
+			u"Accent"_q,
+			QString(),
+		},
+		{ u"proton"_q, {}, {}, {}, u"Proton"_q, u":/gui/art/molten_icons/proton.png"_q },
+		{ u"sad"_q, {}, {}, {}, u"Sad"_q, u":/gui/art/molten_icons/sad.png"_q },
+		{ u"schizophrenia"_q, {}, {}, {}, u"Schizophrenia"_q, u":/gui/art/molten_icons/schizophrenia.png"_q },
+		{ u"burning"_q, {}, {}, {}, u"Burning"_q, u":/gui/art/molten_icons/burning.png"_q },
+		{ u"anotherchance"_q, {}, {}, {}, u"Another Chance"_q, u":/gui/art/molten_icons/anotherchance.png"_q },
+		{ u"cinema"_q, {}, {}, {}, u"Cinema"_q, u":/gui/art/molten_icons/cinema.png"_q },
+		{ u"sunrise"_q, {}, {}, {}, u"Sunrise"_q, u":/gui/art/molten_icons/sunrise.png"_q },
+		{ u"star"_q, {}, {}, {}, u"Star"_q, u":/gui/art/molten_icons/star.png"_q },
+		{ u"coffee"_q, {}, {}, {}, u"Coffee"_q, u":/gui/art/molten_icons/coffee.png"_q },
+		{ u"glacier"_q, {}, {}, {}, u"Glacier"_q, u":/gui/art/molten_icons/glacier.png"_q },
+		{ u"google"_q, {}, {}, {}, u"Google"_q, u":/gui/art/molten_icons/google.png"_q },
+		{ u"beer"_q, {}, {}, {}, u"Beer"_q, u":/gui/art/molten_icons/beer.png"_q },
+		{ u"magma"_q, {}, {}, {}, u"Magma"_q, u":/gui/art/molten_icons/magma.png"_q },
+		{ u"stilllife"_q, {}, {}, {}, u"Still Life"_q, u":/gui/art/molten_icons/stilllife.png"_q },
+		{ u"toxic"_q, {}, {}, {}, u"Toxic"_q, u":/gui/art/molten_icons/toxic.png"_q },
+		{ u"coral"_q, {}, {}, {}, u"Coral"_q, u":/gui/art/molten_icons/coral.png"_q },
+		{ u"onyx"_q, {}, {}, {}, u"Onyx"_q, u":/gui/art/molten_icons/onyx.png"_q },
+		{ u"candy"_q, {}, {}, {}, u"Candy"_q, u":/gui/art/molten_icons/candy.png"_q },
+		{ u"exteragram"_q, {}, {}, {}, u"ExteraGram"_q, u":/gui/art/molten_icons/exteragram.png"_q },
+		{ u"nothing"_q, {}, {}, {}, u"Nothing"_q, u":/gui/art/molten_icons/nothing.png"_q },
+		{ u"pizza"_q, {}, {}, {}, u"Pizza"_q, u":/gui/art/molten_icons/pizza.png"_q },
+		{ u"yinyang"_q, {}, {}, {}, u"Yin-Yang"_q, u":/gui/art/molten_icons/yinyang.png"_q },
+		{ u"rage"_q, {}, {}, {}, u"Rage"_q, u":/gui/art/molten_icons/rage.png"_q },
+		{ u"aero"_q, {}, {}, {}, u"Aero"_q, u":/gui/art/molten_icons/aero.png"_q },
+		{ u"stone"_q, {}, {}, {}, u"Stone"_q, u":/gui/art/molten_icons/stone.png"_q },
 	};
 }
 
@@ -193,6 +216,44 @@ QImage Render(int size, const QString &id, bool square) {
 		QSize(size, size),
 		QImage::Format_ARGB32_Premultiplied);
 	result.fill(Qt::transparent);
+
+	const auto rect = QRectF(0, 0, size, size);
+	if (!variant.resourcePath.isEmpty()) {
+		static auto cache = QHash<QString, QImage>();
+		auto it = cache.find(variant.resourcePath);
+		if (it == cache.end()) {
+			auto loaded = QImage(variant.resourcePath);
+			if (!loaded.isNull()) {
+				loaded = loaded.convertToFormat(
+					QImage::Format_ARGB32_Premultiplied);
+			}
+			it = cache.insert(variant.resourcePath, std::move(loaded));
+		}
+		if (!it->isNull()) {
+			auto scaled = it->scaled(
+				size,
+				size,
+				Qt::KeepAspectRatioByExpanding,
+				Qt::SmoothTransformation);
+			if (scaled.width() != size || scaled.height() != size) {
+				const auto sx = (scaled.width() - size) / 2;
+				const auto sy = (scaled.height() - size) / 2;
+				scaled = scaled.copy(sx, sy, size, size);
+			}
+			auto p = QPainter(&result);
+			auto hq = PainterHighQualityEnabler(p);
+			auto clip = QPainterPath();
+			if (square) {
+				const auto radius = size * 0.23;
+				clip.addRoundedRect(rect, radius, radius);
+			} else {
+				clip.addEllipse(rect);
+			}
+			p.setClipPath(clip);
+			p.drawImage(0, 0, scaled);
+			return result;
+		}
+	}
 
 	auto glyph = Glyph().scaled(
 		size,
@@ -212,7 +273,6 @@ QImage Render(int size, const QString &id, bool square) {
 	gradient.setColorAt(1., variant.to);
 	p.setPen(Qt::NoPen);
 	p.setBrush(gradient);
-	const auto rect = QRectF(0, 0, size, size);
 	if (square) {
 		const auto radius = size * 0.23;
 		p.drawRoundedRect(rect, radius, radius);

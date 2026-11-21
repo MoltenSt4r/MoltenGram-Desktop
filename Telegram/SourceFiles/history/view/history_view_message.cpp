@@ -12,6 +12,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 #include "extera/extera_config.h"
 #include "extera/extera_streamer.h"
+#include "extera/molten_avatar_shapes.h"
 
 #include "api/api_suggest_post.h"
 #include "api/api_transcribes.h"
@@ -2048,6 +2049,12 @@ void Message::draw(Painter &p, const PaintContext &context) const {
 					.gaps = richPageGaps,
 					.torn = rich->tornEdges.get(),
 				});
+		} else if (Extera::GlassBubbles::Enabled()
+			&& mediaSelectionIntervals.empty()) {
+			Extera::GlassBubbles::PaintGlassBubble(
+				p,
+				simple,
+				context.backgroundAverage);
 		} else {
 			Ui::PaintBubble(
 				p,

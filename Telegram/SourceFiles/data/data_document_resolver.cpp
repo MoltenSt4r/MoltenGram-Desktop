@@ -8,6 +8,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "data/data_document_resolver.h"
 
 #include "extera/extera_pdf_viewer.h"
+#include "extera/molten_playlists.h"
 
 #include "extera/extera_plugins.h"
 #include "extera/extera_plugins_ui.h"
@@ -369,6 +370,14 @@ void ResolveDocument(
 						tr::now,
 						lt_error,
 						error));
+				return;
+			}
+			if (controller
+				&& Extera::Playlists::IsPlaylistFile(path)) {
+				Extera::Playlists::HandlePlaylistFileClick(
+					controller,
+					path,
+					document->filename());
 				return;
 			}
 			if (controller

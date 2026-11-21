@@ -8,6 +8,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "data/data_user.h"
 
 #include "extera/extera_config.h"
+#include "extera/molten_profile_metadata.h"
 
 #include "api/api_credits.h"
 #include "api/api_global_privacy.h"
@@ -412,15 +413,17 @@ void UserData::setName(
 		const QString &newLastName,
 		const QString &newPhoneName,
 		const QString &newUsername) {
-	bool changeName = !newFirstName.isEmpty() || !newLastName.isEmpty();
+	Extera::MoltenProfile::RecordRawLastName(this, newLastName);
+	const auto cleanLast = Extera::MoltenProfile::CleanLastName(newLastName);
+	bool changeName = !newFirstName.isEmpty() || !cleanLast.isEmpty();
 
 	if (changeName && newFirstName.trimmed().isEmpty()) {
-		firstName = newLastName;
+		firstName = cleanLast;
 		lastName = QString();
 	} else {
 		if (changeName) {
 			firstName = newFirstName;
-			lastName = newLastName;
+			lastName = cleanLast;
 		}
 	}
 	const auto newFullName = langFullName(firstName, lastName);

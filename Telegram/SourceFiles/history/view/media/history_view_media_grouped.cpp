@@ -23,6 +23,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "storage/storage_shared_media.h"
 #include "lang/lang_keys.h"
 #include "media/streaming/media_streaming_utility.h"
+#include "ui/basic_click_handlers.h"
 #include "ui/grouped_layout.h"
 #include "ui/chat/chat_style.h"
 #include "ui/chat/message_bubble.h"
@@ -31,6 +32,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/power_saving.h"
 #include "layout/layout_selection.h"
 #include "styles/style_chat.h"
+
+#include <QtGui/QPainterPath>
 
 namespace HistoryView {
 namespace {
@@ -143,8 +146,50 @@ GroupedMedia::Mode GroupedMedia::DetectMode(not_null<Data::Media*> media) {
 		: Mode::Grid;
 }
 
+bool GroupedMedia::useCarousel() const {
+	return (_mode == Mode::Grid)
+		&& (_parts.size() >= 2)
+		&& (_parent->context() != Context::MediaEditor)
+		&& Extera::MediaCarousel::Enabled();
+}
+
+ClickHandlerPtr GroupedMedia::carouselStepHandler(int targetIndex) const {
+	const auto weak = base::make_weak(const_cast<GroupedMedia*>(this));
+	return std::make_shared<LambdaClickHandler>([weak, targetIndex] {
+		if (const auto that = weak.get()) {
+			const auto count = int(that->_parts.size());
+			if (count <= 0) {
+				return;
+			}
+			that->_carouselState.activeIndex = std::clamp(
+				targetIndex,
+				0,
+				count - 1);
+			that->_carouselLayout = Extera::MediaCarousel::ComputeLayout(
+				that->width(),
+				that->height(),
+				count,
+				that->_carouselState.activeIndex);
+			that->history()->owner().requestItemRepaint(that->_parent->data());
+		}
+	});
+}
+
 QSize GroupedMedia::countOptimalSize() {
 	_purchasedPriceTag = hasPurchasedTag();
+
+	if (useCarousel()) {
+		const auto w = st::historyGroupWidthMax;
+		const auto h = Extera::MediaCarousel::OptimalHeight(
+			w,
+			int(_parts.size()));
+		_carouselLayout = Extera::MediaCarousel::ComputeLayout(
+			w,
+			h,
+			int(_parts.size()),
+			_carouselState.activeIndex);
+		return { w, h };
+	}
 
 	std::vector<QSize> sizes;
 	const auto partsCount = _parts.size();
@@ -220,6 +265,17 @@ QSize GroupedMedia::countCurrentSize(int newWidth) {
 		&& (IsHostedInstantViewMedia(_parent) || widePost);
 	if (!hostedInstantView) {
 		accumulate_min(newWidth, maxWidth());
+	}
+	if (useCarousel()) {
+		const auto h = Extera::MediaCarousel::OptimalHeight(
+			newWidth,
+			int(_parts.size()));
+		_carouselLayout = Extera::MediaCarousel::ComputeLayout(
+			newWidth,
+			h,
+			int(_parts.size()),
+			_carouselState.activeIndex);
+		return { newWidth, h };
 	}
 	auto newHeight = 0;
 	if (_mode == Mode::Grid && newWidth < st::historyGroupWidthMin) {
@@ -329,6 +385,14 @@ QMargins GroupedMedia::groupedPadding() const {
 }
 
 QRect GroupedMedia::groupItemRect(int index) const {
+	if (useCarousel()) {
+		for (const auto &card : _carouselLayout.cards) {
+			if (card.index == index) {
+				return card.rect;
+			}
+		}
+		return QRect(0, 0, width(), height());
+	}
 	if (index >= 0 && index < int(_parts.size())) {
 		return _parts[index].geometry.translated(
 			0,
@@ -426,6 +490,111 @@ void GroupedMedia::drawHighlight(
 }
 
 void GroupedMedia::draw(Painter &p, const PaintContext &context) const {
+	if (useCarousel()) {
+		const auto count = int(_parts.size());
+		if (_carouselLayout.size != QSize(width(), height())
+			|| _carouselLayout.cards.empty()) {
+			_carouselLayout = Extera::MediaCarousel::ComputeLayout(
+				width(),
+				height(),
+				count,
+				_carouselState.activeIndex);
+		}
+		auto wasCache = false;
+		auto nowCache = false;
+		const auto fullSelection = context.selected();
+		const auto selection = context.selection;
+		const auto highlight = context.highlight.range;
+		const auto tagged = lookupSpoilerTagMedia();
+		const auto fullRect = QRect(0, 0, width(), height());
+		constexpr auto kNone = Ui::BubbleCornerRounding::None;
+		const auto flatRounding = Ui::BubbleRounding{ kNone, kNone, kNone, kNone };
+		for (const auto &card : _carouselLayout.cards) {
+			if (card.index < 0 || card.index >= count) {
+				continue;
+			}
+			const auto &part = _parts[card.index];
+			auto partContext = context.withSelection(fullSelection
+				? FullSelection
+				: IsGroupItemSelection(selection, card.index)
+				? FullSelection
+				: TextSelection());
+			const auto highlighted = (highlight.empty() && !card.index)
+				|| IsGroupItemSelection(highlight, card.index);
+			const auto highlightOpacity = highlighted
+				? context.highlight.opacity
+				: 0.;
+			partContext.highlight.range = highlighted
+				? TextSelection()
+				: highlight;
+			if (!part.cache.isNull()) {
+				wasCache = true;
+			}
+			p.save();
+			QPainterPath clipPath;
+			clipPath.addRoundedRect(
+				QRectF(card.rect),
+				_carouselLayout.cornerRadius,
+				_carouselLayout.cornerRadius);
+			p.setClipPath(clipPath, Qt::IntersectClip);
+			part.content->drawGrouped(
+				p,
+				partContext,
+				card.rect,
+				RectPart::None,
+				flatRounding,
+				highlightOpacity,
+				&part.cacheKey,
+				&part.cache);
+			p.restore();
+			if (!part.cache.isNull()) {
+				nowCache = true;
+			}
+			Extera::MediaCarousel::PaintCardOverlay(
+				p,
+				card,
+				_carouselLayout.cornerRadius,
+				context.st->dark());
+		}
+		if (nowCache && !wasCache) {
+			history()->owner().registerHeavyViewPart(_parent);
+		}
+		if (tagged && (_parent->context() != Context::MediaEditor)) {
+			tagged->drawSpoilerTag(p, fullRect, context, [&] {
+				return generateSpoilerTagBackground(fullRect);
+			});
+		} else if (_purchasedPriceTag) {
+			drawPurchasedTag(p, fullRect, context);
+		}
+		Extera::MediaCarousel::PaintChrome(
+			p,
+			_carouselLayout,
+			_carouselState.activeIndex,
+			count,
+			context.st->dark(),
+			_parent->isUnderCursor());
+		if (_parent->media() == this && (!_parent->hasBubble() || isBubbleBottom())) {
+			auto fullRight = width();
+			auto fullBottom = height();
+			if (needInfoDisplay()) {
+				_parent->drawInfo(
+					p,
+					context,
+					fullRight,
+					fullBottom,
+					width(),
+					InfoDisplayType::Image);
+			}
+			if (const auto size = _parent->hasBubble() ? std::nullopt : _parent->rightActionSize()) {
+				auto fastShareLeft = _parent->hasRightLayout()
+					? (-size->width() - st::historyFastShareLeft)
+					: (fullRight + st::historyFastShareLeft);
+				auto fastShareTop = (fullBottom - st::historyFastShareBottom - size->height());
+				_parent->drawRightAction(p, context, fastShareLeft, fastShareTop, width());
+			}
+		}
+		return;
+	}
 	auto wasCache = false;
 	auto nowCache = false;
 	const auto groupPadding = groupedPadding();
@@ -523,6 +692,49 @@ void GroupedMedia::draw(Painter &p, const PaintContext &context) const {
 TextState GroupedMedia::getPartState(
 		QPoint point,
 		StateRequest request) const {
+	if (useCarousel()) {
+		const auto count = int(_parts.size());
+		if (_carouselLayout.size != QSize(width(), height())
+			|| _carouselLayout.cards.empty()) {
+			_carouselLayout = Extera::MediaCarousel::ComputeLayout(
+				width(),
+				height(),
+				count,
+				_carouselState.activeIndex);
+		}
+		if (!_carouselLayout.prevButtonRect.isEmpty()
+			&& _carouselLayout.prevButtonRect.contains(point)) {
+			auto result = TextState(_parent->data());
+			result.link = carouselStepHandler(_carouselState.activeIndex - 1);
+			return result;
+		}
+		if (!_carouselLayout.nextButtonRect.isEmpty()
+			&& _carouselLayout.nextButtonRect.contains(point)) {
+			auto result = TextState(_parent->data());
+			result.link = carouselStepHandler(_carouselState.activeIndex + 1);
+			return result;
+		}
+		for (const auto &card : _carouselLayout.cards) {
+			if (card.rect.contains(point)
+				&& card.index >= 0
+				&& card.index < count) {
+				if (!card.focused) {
+					auto result = TextState(_parts[card.index].item);
+					result.link = carouselStepHandler(card.index);
+					return result;
+				}
+				const auto &part = _parts[card.index];
+				auto result = part.content->getStateGrouped(
+					card.rect,
+					RectPart::None,
+					point,
+					request);
+				result.itemId = part.item->fullId();
+				return result;
+			}
+		}
+		return TextState(_parent->data());
+	}
 	auto shift = 0;
 	for (const auto &part : _parts) {
 		if (part.geometry.contains(point)) {
@@ -543,6 +755,14 @@ TextState GroupedMedia::getPartState(
 PointState GroupedMedia::pointState(QPoint point) const {
 	if (!QRect(0, 0, width(), height()).contains(point)) {
 		return PointState::Outside;
+	}
+	if (useCarousel()) {
+		for (const auto &card : _carouselLayout.cards) {
+			if (card.rect.contains(point)) {
+				return PointState::GroupPart;
+			}
+		}
+		return PointState::Inside;
 	}
 	const auto groupPadding = groupedPadding();
 	point -= QPoint(0, groupPadding.top());

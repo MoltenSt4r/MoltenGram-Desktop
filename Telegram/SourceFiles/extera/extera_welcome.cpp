@@ -297,13 +297,6 @@ void ShowWelcomeBox(not_null<Window::SessionController*> controller) {
 			addTitle(tr::lng_exd_wizard_icon());
 			const auto variants = AppIcon::Variants();
 			const auto count = int(variants.size());
-			const auto titles = std::vector<QString>{
-				tr::lng_extera_app_icon_default(tr::now),
-				tr::lng_exd_app_icon_telegram(tr::now),
-				tr::lng_exd_app_icon_accent(tr::now),
-				tr::lng_exd_app_icon_dark(tr::now),
-				tr::lng_exd_app_icon_light(tr::now),
-			};
 			const auto images = std::make_shared<std::vector<QImage>>();
 			const auto ratio = style::DevicePixelRatio();
 			const auto size = st::exteraAppIconSize;
@@ -374,7 +367,7 @@ void ShowWelcomeBox(not_null<Window::SessionController*> controller) {
 							st::exteraAppIconCaptionFont->height),
 						Qt::AlignHCenter | Qt::AlignTop,
 						st::exteraAppIconCaptionFont->elided(
-							titles[i],
+							variants[i].title,
 							cell - 4));
 				}
 			}, grid->lifetime());

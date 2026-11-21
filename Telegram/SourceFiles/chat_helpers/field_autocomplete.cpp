@@ -6,6 +6,8 @@ For license and copyright information please follow this link:
 https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "chat_helpers/field_autocomplete.h"
+
+#include "extera/molten_custom_commands.h"
 #include "history/history.h"
 #include "history/history_item.h"
 #include "history/view/history_view_element.h"
@@ -247,6 +249,8 @@ struct FieldAutocomplete::BotCommandRow {
 	Ui::PeerUserpicView userpic;
 	Ui::Text::String descriptionText;
 	bool ephemeral = false;
+	QString customPrefix;
+	bool isCustom = false;
 };
 
 FieldAutocomplete::FieldAutocomplete(
@@ -422,6 +426,7 @@ void FieldAutocomplete::showFiltered(
 	query = query.toLower();
 	auto type = Type::Stickers;
 	auto plainQuery = QStringView(query);
+	auto customPrefix = QString();
 	switch (query.at(0).unicode()) {
 	case '@':
 		type = Type::Mentions;
@@ -435,10 +440,21 @@ void FieldAutocomplete::showFiltered(
 		type = Type::BotCommands;
 		plainQuery = base::StringViewMid(query, 1);
 		break;
+	default:
+		if (Extera::MoltenCommands::Enabled()
+			&& Extera::MoltenCommands::IsPrefix(query.left(1))) {
+			type = Type::BotCommands;
+			customPrefix = query.left(1);
+			plainQuery = base::StringViewMid(query, 1);
+		}
+		break;
 	}
-	const auto resetScroll = (_type != type || _filter != plainQuery);
+	const auto resetScroll = (_type != type
+		|| _filter != plainQuery
+		|| _customPrefix != customPrefix);
 	if (resetScroll) {
 		_type = type;
+		_customPrefix = customPrefix;
 		_filter = TextUtilities::RemoveAccents(plainQuery.toString());
 	}
 	_addInlineBots = addInlineBots;
@@ -767,6 +783,18 @@ void FieldAutocomplete::updateFiltered(bool resetScroll) {
 			}
 			hrows.push_back(tag);
 		}
+	} else if (_type == Type::BotCommands && !_customPrefix.isEmpty()) {
+		const auto self = _session->user();
+		for (const auto &cmd : Extera::MoltenCommands::Match(_customPrefix, _filter)) {
+			brows.push_back({
+				.user = self,
+				.command = cmd.name,
+				.description = cmd.description,
+				.userpic = self->activeUserpicView(),
+				.customPrefix = cmd.prefix,
+				.isCustom = true,
+			});
+		}
 	} else if (_type == Type::BotCommands) {
 		const auto listAllSuggestions = _filter.isEmpty();
 		const auto hasUsername = _filter.indexOf('@') > 0;
@@ -891,6 +919,19 @@ void FieldAutocomplete::updateFiltered(bool resetScroll) {
 			}
 			if (!brows.empty()) {
 				brows.insert(begin(brows), { .user = self }); // Edit.
+			}
+		}
+		if (Extera::MoltenCommands::Enabled()) {
+			const auto self = _session->user();
+			for (const auto &cmd : Extera::MoltenCommands::Match(u"/"_q, _filter)) {
+				brows.push_back({
+					.user = self,
+					.command = cmd.name,
+					.description = cmd.description,
+					.userpic = self->activeUserpicView(),
+					.customPrefix = u"/"_q,
+					.isCustom = true,
+				});
 			}
 		}
 	}
@@ -1518,7 +1559,7 @@ void FieldAutocomplete::Inner::paintRows(Painter &p, QRect clip) {
 			}
 
 			auto toHighlight = row.command;
-			if (withUsername) {
+			if (!row.isCustom && withUsername) {
 				toHighlight += '@' + PrimaryUsername(user);
 			}
 			user->loadUserpic();
@@ -1530,7 +1571,9 @@ void FieldAutocomplete::Inner::paintRows(Painter &p, QRect clip) {
 				width(),
 				st::mentionPhotoSize);
 
-			const auto commandText = '/' + toHighlight;
+			const auto commandText = (row.isCustom
+				? row.customPrefix
+				: u"/"_q) + toHighlight;
 
 			p.setPen(selected ? st::mentionNameFgOver : st::mentionNameFg);
 			p.setFont(st::semiboldFont);
@@ -1734,14 +1777,20 @@ bool FieldAutocomplete::Inner::chooseAtIndex(
 		}
 	} else if (!_brows->empty()) {
 		if (index < _brows->size()) {
-			const auto user = _brows->at(index).user;
-			const auto &command = _brows->at(index).command;
+			const auto &row = _brows->at(index);
+			const auto user = row.user;
+			const auto &command = row.command;
+			if (row.isCustom) {
+				const auto commandString = row.customPrefix + command;
+				_botCommandChosen.fire({ user, commandString, method, true });
+				return true;
+			}
 			const auto commandString = u"/%1%2"_q.arg(
 				command,
 				commandsWithUsername()
 					? ('@' + PrimaryUsername(user))
 					: QString());
-			_botCommandChosen.fire({ user, commandString, method });
+			_botCommandChosen.fire({ user, commandString, method, false });
 			return true;
 		}
 	}
@@ -2194,6 +2243,20 @@ void InitFieldAutocomplete(
 		: nullptr;
 	raw->botCommandChosen(
 	) | rpl::on_next([=](FieldAutocomplete::BotCommandChosen data) {
+		if (data.isCustom) {
+			auto cursor = field->rawTextEdit()->textCursor();
+			const auto pos = cursor.position();
+			const auto full = field->getLastText();
+			auto start = std::min(pos, int(full.size()));
+			while (start > 0 && !full[start - 1].isSpace()) {
+				--start;
+			}
+			cursor.setPosition(start);
+			cursor.setPosition(pos, QTextCursor::KeepAnchor);
+			cursor.insertText(data.command + ' ');
+			field->rawTextEdit()->setTextCursor(cursor);
+			return;
+		}
 		if (!features().autocompleteCommands) {
 			return;
 		}
@@ -2257,6 +2320,15 @@ void InitFieldAutocomplete(
 		}
 		if (!parsed.query.isEmpty() && parsed.query[0] == '@') {
 			peer->session().topGuestChatBots().reload();
+		}
+		if (parsed.query.isEmpty() && Extera::MoltenCommands::Enabled()) {
+			const auto custom = Extera::MoltenCommands::ParseQuery(
+				field->getLastText(),
+				field->textCursor().position());
+			if (!custom.query.isEmpty()) {
+				raw->showFiltered(peer, custom.query, custom.fromStart);
+				return;
+			}
 		}
 		raw->showFiltered(peer, parsed.query, parsed.fromStart);
 	};

@@ -1961,6 +1961,20 @@ PRIVATE
     extera/extera_app_icon.h
     extera/extera_full_player.cpp
     extera/extera_full_player.h
+    extera/molten_avatar_shapes.cpp
+    extera/molten_avatar_shapes.h
+    extera/molten_bot_sync.cpp
+    extera/molten_bot_sync.h
+    extera/molten_custom_commands.cpp
+    extera/molten_custom_commands.h
+    extera/molten_media_carousel.cpp
+    extera/molten_media_carousel.h
+    extera/molten_playlists.cpp
+    extera/molten_playlists.h
+    extera/molten_profile_metadata.cpp
+    extera/molten_profile_metadata.h
+    extera/molten_url_cleaner.cpp
+    extera/molten_url_cleaner.h
     extera/extera_pdf_viewer.cpp
     extera/extera_pdf_viewer.h
     extera/extera_plugin_trust.cpp
