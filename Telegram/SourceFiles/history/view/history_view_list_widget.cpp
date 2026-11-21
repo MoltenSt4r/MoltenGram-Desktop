@@ -8,6 +8,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "extera/extera_menu.h"
 #include "history/view/history_view_list_widget.h"
 
+#include "extera/molten_chat_extras.h"
+
 #include "history/view/history_view_about_view.h"
 #include "base/unixtime.h"
 #include "base/qt/qt_key_modifiers.h"
@@ -4363,6 +4365,11 @@ void ListWidget::mouseDoubleClickEvent(QMouseEvent *e) {
 		&& (_overElement->data()->isRegular()
 			|| CanReplyToEphemeral(_overElement->data()))) {
 		mouseActionCancel();
+		if (Extera::ChatExtras::DoubleTapEnabled()) {
+			if (Extera::ChatExtras::HandleDoubleTap(controller(), _overElement->data(), _overElement)) {
+				return;
+			}
+		}
 		switch (CurrentQuickAction()) {
 		case DoubleClickQuickAction::Reply: {
 			replyToMessageRequestNotify({ _overElement->data()->fullId() });

@@ -1975,6 +1975,20 @@ PRIVATE
     extera/molten_profile_metadata.h
     extera/molten_url_cleaner.cpp
     extera/molten_url_cleaner.h
+    extera/molten_chat_extras.cpp
+    extera/molten_chat_extras.h
+    extera/molten_device_spoof.cpp
+    extera/molten_device_spoof.h
+    extera/molten_nowplaying.cpp
+    extera/molten_nowplaying.h
+    extera/molten_pillstack.cpp
+    extera/molten_pillstack.h
+    extera/molten_qr.cpp
+    extera/molten_qr.h
+    extera/molten_songrec.cpp
+    extera/molten_songrec.h
+    extera/molten_voice_changer.cpp
+    extera/molten_voice_changer.h
     extera/extera_pdf_viewer.cpp
     extera/extera_pdf_viewer.h
     extera/extera_plugin_trust.cpp

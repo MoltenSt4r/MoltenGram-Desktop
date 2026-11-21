@@ -15,6 +15,7 @@
 #include "extera/extera_config.h"
 #include "extera/extera_plugins.h"
 #include "extera/molten_playlists.h"
+#include "extera/molten_songrec.h"
 #include "history/history.h"
 #include "history/history_item.h"
 #include "lang/lang_keys.h"
@@ -1762,6 +1763,9 @@ void View::contextMenuEvent(QContextMenuEvent *e) {
 	_pluginMenu->addAction(u"My Playlists"_q, [=] {
 		Extera::Playlists::ShowPlaylistsBox(_controller);
 	}, &st::menuIconFave);
+	_pluginMenu->addAction(u"Identify Music (SongRec)"_q, [=] {
+		Extera::SongRec::RecognizeCurrentPlayback(_controller);
+	}, &st::menuIconMicrophone);
 
 	const auto items = Extera::Plugins::PlayerMenuItems();
 	if (!items.empty()) {

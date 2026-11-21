@@ -7,6 +7,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "history/view/history_view_reply.h"
 
+#include "extera/molten_chat_extras.h"
+
 #include "extera/extera_config.h"
 #include "styles/style_settings.h"
 #include "extera/extera_streamer.h"
@@ -357,6 +359,7 @@ Reply::~Reply() = default;
 void Reply::update(
 		not_null<Element*> view,
 		not_null<HistoryMessageReply*> data) {
+	Extera::ChatExtras::RetainReply(view->data());
 	const auto item = view->data();
 	const auto &fields = data->fields();
 	const auto &quote = fields.displayQuote();
@@ -715,11 +718,13 @@ void Reply::updateName(
 	_maxWidth = std::max(nameMaxWidth, optimalTextSize.width());
 	if (!data->displaying()) {
 		const auto unavailable = data->unavailable();
-		_stateText = ((fields.messageId || fields.storyId) && !unavailable)
-			? tr::lng_profile_loading(tr::now)
-			: fields.storyId
-			? tr::lng_deleted_story(tr::now)
-			: tr::lng_deleted_message(tr::now);
+		if (!Extera::ChatExtras::ResolveDeletedReplyState(fields.externalPeerId ? fields.externalPeerId : history->peer->id, fields.messageId, _stateText)) {
+			_stateText = ((fields.messageId || fields.storyId) && !unavailable)
+				? tr::lng_profile_loading(tr::now)
+				: fields.storyId
+				? tr::lng_deleted_story(tr::now)
+				: tr::lng_deleted_message(tr::now);
+		}
 		const auto phraseWidth = st::msgDateFont->width(_stateText);
 		_maxWidth = unavailable
 			? phraseWidth

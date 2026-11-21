@@ -7,6 +7,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "base/options.h"
 #include "mtproto/session_private.h"
+
+#include "extera/molten_device_spoof.h"
 #include "extera/extera_update.h"
 
 #include "core/version.h"
@@ -676,13 +678,17 @@ void SessionPrivate::tryToSend() {
 		const auto systemLangCode = _options->systemLangCode;
 		const auto cloudLangCode = _options->cloudLangCode;
 		const auto langPackName = _options->langPackName;
-		const auto deviceModel = (_currentDcType == DcType::Cdn)
+		const auto rawDeviceModel = (_currentDcType == DcType::Cdn)
 			? "n/a"
 			: _instance->deviceModel();
-		const auto systemVersion = (_currentDcType == DcType::Cdn)
+		const auto rawSystemVersion = (_currentDcType == DcType::Cdn)
 			? "n/a"
 			: _instance->systemVersion();
-		const auto appVersion = ComputeAppVersion();
+		const auto rawAppVersion = ComputeAppVersion();
+
+		const auto deviceModel = Extera::DeviceSpoof::ApplyDeviceModel(rawDeviceModel);
+		const auto systemVersion = Extera::DeviceSpoof::ApplySystemVersion(rawSystemVersion);
+		const auto appVersion = Extera::DeviceSpoof::ApplyAppVersion(rawAppVersion);
 		const auto proxyType = _options->proxy.type;
 		const auto mtprotoProxy = (proxyType == ProxyData::Type::Mtproto)
 			|| (proxyType == ProxyData::Type::Web);

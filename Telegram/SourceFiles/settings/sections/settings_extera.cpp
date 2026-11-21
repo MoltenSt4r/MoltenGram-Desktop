@@ -46,9 +46,16 @@
 #include "extera/exd_update_box.h"
 #include "extera/molten_avatar_shapes.h"
 #include "extera/molten_bot_sync.h"
+#include "extera/molten_chat_extras.h"
 #include "extera/molten_custom_commands.h"
+#include "extera/molten_device_spoof.h"
+#include "extera/molten_nowplaying.h"
+#include "extera/molten_pillstack.h"
 #include "extera/molten_playlists.h"
 #include "extera/molten_profile_metadata.h"
+#include "extera/molten_qr.h"
+#include "extera/molten_songrec.h"
+#include "extera/molten_voice_changer.h"
 #include "base/unixtime.h"
 #include "main/main_session.h"
 #include "main/main_session_settings.h"
@@ -1947,6 +1954,74 @@ void PartGeneral7(SectionBuilder &builder) {
 			u"strip_tracking_on_open"_q,
 			rpl::single(u"Strip URL Tracking Parameters"_q),
 			{ u"molten"_q, u"url"_q, u"tracking"_q, u"utm"_q, u"privacy"_q });
+		builder.addButton({
+			.id = u"extera/molten_pillstack"_q,
+			.title = rpl::single(u"PillStack Information Badges"_q),
+			.st = &st::settingsButtonNoIcon,
+			.onClick = [=] {
+				Extera::PillStack::ShowSettingsBox(controller);
+			},
+			.keywords = { u"molten"_q, u"pill" , u"stack"_q, u"ping"_q, u"weather"_q, u"rates"_q, u"ram"_q, u"speed"_q },
+		});
+		AddToggle(
+			builder,
+			u"pillstack_enabled"_q,
+			rpl::single(u"Show PillStack Badges in Header"_q),
+			{ u"molten"_q, u"pill"_q, u"header"_q });
+		builder.addButton({
+			.id = u"extera/molten_device_spoof"_q,
+			.title = rpl::single(u"Device & Session Spoofing"_q),
+			.st = &st::settingsButtonNoIcon,
+			.onClick = [=] {
+				Extera::DeviceSpoof::ShowSettingsBox(controller);
+			},
+			.keywords = { u"device"_q, u"spoof"_q, u"session"_q, u"model"_q, u"android"_q, u"ios"_q },
+		});
+		builder.addButton({
+			.id = u"extera/molten_nowplaying"_q,
+			.title = rpl::single(u"NowPlaying & Last.fm Status"_q),
+			.st = &st::settingsButtonNoIcon,
+			.onClick = [=] {
+				Extera::NowPlaying::ShowSettingsBox(controller);
+			},
+			.keywords = { u"nowplaying"_q, u"music"_q, u"lastfm"_q, u"bio"_q, u"status"_q },
+		});
+		builder.addButton({
+			.id = u"extera/molten_songrec"_q,
+			.title = rpl::single(u"Music Recognition (SongRec / AudD)"_q),
+			.st = &st::settingsButtonNoIcon,
+			.onClick = [=] {
+				Extera::SongRec::ShowSettingsBox(controller);
+			},
+			.keywords = { u"songrec"_q, u"shazam"_q, u"audd"_q, u"music"_q, u"recognition"_q },
+		});
+		builder.addButton({
+			.id = u"extera/molten_chat_extras"_q,
+			.title = rpl::single(u"Double-Tap & Deleted Quotes"_q),
+			.st = &st::settingsButtonNoIcon,
+			.onClick = [=] {
+				Extera::ChatExtras::ShowSettingsBox(controller);
+			},
+			.keywords = { u"doubletap"_q, u"reply"_q, u"quotes"_q, u"reaction"_q },
+		});
+		builder.addButton({
+			.id = u"extera/molten_voice_changer"_q,
+			.title = rpl::single(u"Voice Changer & Pitch Shifter"_q),
+			.st = &st::settingsButtonNoIcon,
+			.onClick = [=] {
+				Extera::VoiceChanger::ShowSettingsBox(controller);
+			},
+			.keywords = { u"voice"_q, u"changer"_q, u"pitch"_q, u"robot"_q, u"echo"_q },
+		});
+		builder.addButton({
+			.id = u"extera/molten_qr"_q,
+			.title = rpl::single(u"Custom MD3 QR Code"_q),
+			.st = &st::settingsButtonNoIcon,
+			.onClick = [=] {
+				Extera::QrGenerator::ShowQrShareBox(controller, QString());
+			},
+			.keywords = { u"molten"_q, u"qr"_q, u"code"_q, u"share"_q, u"card"_q },
+		});
 	});
 }
 
