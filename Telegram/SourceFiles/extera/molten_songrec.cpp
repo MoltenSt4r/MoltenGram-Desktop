@@ -1016,15 +1016,15 @@ void Service::queryShazam(
 	body[u"timestamp"_q] = now;
 	body[u"timezone"_q] = u"UTC"_q;
 
-	const auto u1 = QUuid::createUuid().toString(QUuid::WithoutBrackets).toUpper();
-	const auto u2 = QUuid::createUuid().toString(QUuid::WithoutBrackets).toUpper();
+	const auto u1 = QUuid::createUuid().toString(QUuid::WithoutBraces).toUpper();
+	const auto u2 = QUuid::createUuid().toString(QUuid::WithoutBraces).toUpper();
 	const auto urlStr = QString(
 		"https://amp.shazam.com/discovery/v5/en/US/android/-/tag/%1/%2"
 		"?sync=true&webv3=true&sampling=true&connected=&shazamapiversion=v3&sharehub=true&video=v3")
 		.arg(u1, u2);
 
 	auto nam = new QNetworkAccessManager(this);
-	QNetworkRequest req{ QUrl(urlStr) };
+	auto req = QNetworkRequest(QUrl(urlStr));
 	req.setHeader(QNetworkRequest::ContentTypeHeader, u"application/json"_q);
 	req.setRawHeader("Content-Language", "en_US");
 	req.setRawHeader("User-Agent", "Dalvik/2.1.0 (Linux; U; Android 13; Pixel 7 Build/TQ3A.230805.001)");
@@ -1127,7 +1127,7 @@ void Service::queryAudD(
 	filePart.setBody(wavData);
 	multiPart->append(filePart);
 
-	QNetworkRequest req{ QUrl(u"https://api.audd.io/"_q) };
+	auto req = QNetworkRequest(QUrl(u"https://api.audd.io/"_q));
 	const auto reply = nam->post(req, multiPart);
 	multiPart->setParent(reply);
 
