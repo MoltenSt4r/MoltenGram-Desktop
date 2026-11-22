@@ -1256,8 +1256,7 @@ void ShowSettingsBox(not_null<Window::SessionController*> controller) {
 					container,
 					radioGroup,
 					static_cast<int>(preset),
-					fullText,
-					st::defaultRadio));
+					fullText));
 			btn->setCheckAlignment(style::al_topleft);
 			Ui::AddSkip(container, 4);
 		}
@@ -1452,8 +1451,7 @@ void ShowVoiceChangerDialog(
 					container,
 					radioGroup,
 					static_cast<int>(preset),
-					fullText,
-					st::defaultRadio));
+					fullText));
 			btn->setCheckAlignment(style::al_topleft);
 			Ui::AddSkip(container, 4);
 		}

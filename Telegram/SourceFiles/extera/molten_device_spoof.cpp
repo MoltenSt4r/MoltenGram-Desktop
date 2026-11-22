@@ -315,8 +315,7 @@ void ShowSettingsBox(not_null<Window::SessionController*> controller) {
 					container,
 					radioGroup,
 					i,
-					text,
-					st::defaultRadio));
+					text));
 			btn->setCheckAlignment(style::al_topleft);
 			Ui::AddSkip(container, 4);
 		}

@@ -1011,7 +1011,7 @@ void ShowPlaylistDetailsBox(
 				return;
 			}
 			FileDialog::GetWritePath(
-				box,
+				box.get(),
 				u"Export Playlist (.mplaylist)"_q,
 				u"MoltenGram Playlist (*.mplaylist)"_q,
 				SanitizeFileName(current->name) + u".mplaylist"_q,
@@ -1040,7 +1040,7 @@ void ShowPlaylistDetailsBox(
 				return;
 			}
 			FileDialog::GetWritePath(
-				box,
+				box.get(),
 				u"Export Playlist (.m3u8)"_q,
 				u"M3U8 Playlist (*.m3u8)"_q,
 				SanitizeFileName(current->name) + u".m3u8"_q,
@@ -1170,7 +1170,7 @@ void ShowPlaylistsBox(not_null<Window::SessionController*> controller) {
 			{ &st::menuIconDownload }
 		)->setClickedCallback([=] {
 			FileDialog::GetOpenPath(
-				box,
+				box.get(),
 				u"Import Playlist"_q,
 				u"Playlists (*.mplaylist *.m3u8)"_q,
 				[=](FileDialog::OpenResult &&result) {

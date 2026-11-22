@@ -648,8 +648,7 @@ void AddDoubleTapSettings(
 				options,
 				incomingRadioGroup,
 				ActionToInt(action),
-				ActionName(action),
-				st::defaultRadio));
+				ActionName(action)));
 	}
 
 	incomingRadioGroup->setChangedCallback([=](int val) {
@@ -673,8 +672,7 @@ void AddDoubleTapSettings(
 				options,
 				outgoingRadioGroup,
 				ActionToInt(action),
-				ActionName(action),
-				st::defaultRadio));
+				ActionName(action)));
 	}
 
 	outgoingRadioGroup->setChangedCallback([=](int val) {
