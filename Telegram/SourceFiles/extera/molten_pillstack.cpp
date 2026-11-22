@@ -1135,7 +1135,7 @@ void Widget::onPillClicked(int index) {
 		if (settings.isEnabled()) {
 			settings.setSettings(MTP::ProxyData::Settings::Disabled);
 		} else {
-			settings.setSettings(MTP::ProxyData::Settings::Selected);
+			settings.setSettings(MTP::ProxyData::Settings::Enabled);
 		}
 		settings.connectionTypeChangesNotify();
 		Core::App().saveSettingsDelayed();

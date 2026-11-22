@@ -1011,12 +1011,12 @@ void PaintQr(
 		// Clean circular mask
 		p.setPen(Qt::NoPen);
 		p.setBrush(options.cardColor);
-		p.drawEllipse(center, cutoutRadius, cutoutRadius);
+		p.drawEllipse(QPointF(center), cutoutRadius, cutoutRadius);
 
 		// Outer accent ring
 		p.setPen(QPen(QColor(options.accentColor.red(), options.accentColor.green(), options.accentColor.blue(), 75), 1.5));
 		p.setBrush(Qt::NoBrush);
-		p.drawEllipse(center, cutoutRadius - 1.0, cutoutRadius - 1.0);
+		p.drawEllipse(QPointF(center), cutoutRadius - 1.0, cutoutRadius - 1.0);
 
 		// MoltenGram Logo inside mask
 		const double innerLogoR = cutoutRadius * 0.80;
@@ -1153,9 +1153,9 @@ void ShowQrShareBox(
 		: link.trimmed();
 
 	controller->show(Box([=](not_null<Ui::GenericBox*> box) {
-		box->setTitle(title.isEmpty()
-			? rpl::single(u"Share QR Code"_q)
-			: rpl::single(title));
+		box->setTitle(rpl::single(title.isEmpty()
+			? u"Share QR Code"_q
+			: title));
 
 		auto options = RenderOptions();
 		options.title = u"MoltenGram"_q;
