@@ -34,7 +34,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/wrap/vertical_layout.h"
 #include "window/window_session_controller.h"
 
-#include <rpl/single.h>
+#include <rpl/rpl.h>
 #include <rpl/variable.h>
 
 #include <algorithm>

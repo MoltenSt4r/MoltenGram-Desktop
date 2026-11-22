@@ -154,7 +154,7 @@ jobs:
           cd Telegram
           call configure.bat x64 %CREDS%
           cd ..\out
-          msbuild Telegram.slnx /t:Telegram /p:Configuration=Release /m:2
+          msbuild Telegram.slnx /t:Telegram /p:Configuration=Release /m:1 /p:CL_MPCount=2
 
       - name: Package
         shell: pwsh
