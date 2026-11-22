@@ -70,12 +70,15 @@ struct Vec2 {
 	}
 	[[nodiscard]] Vec2 rotatedDegrees(
 			double angleDeg,
-			Vec2 center = {}) const {
+			const Vec2 &center) const {
 		const auto rad = angleDeg * kPi / 180.;
 		const auto c = std::cos(rad);
 		const auto s = std::sin(rad);
 		const auto d = *this - center;
 		return Vec2{ d.x * c - d.y * s, d.x * s + d.y * c } + center;
+	}
+	[[nodiscard]] Vec2 rotatedDegrees(double angleDeg) const {
+		return rotatedDegrees(angleDeg, Vec2{ 0., 0. });
 	}
 };
 
@@ -1150,8 +1153,8 @@ void PaintGlassBubble(
 	}
 
 	const auto path = BuildBubblePath(g, simple.rounding);
-	const auto stm = simple.st->messageStyle(simple.outbg, simple.selected);
-	const auto baseColor = stm->msgBg->c;
+	const auto &stm = simple.st->messageStyle(simple.outbg, simple.selected);
+	const auto baseColor = stm.msgBg->c;
 	const auto isDark = simple.st->dark();
 	const auto opacityNorm = Opacity() / 100.;
 

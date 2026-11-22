@@ -19,6 +19,17 @@ jobs:
           persist-credentials: false
           submodules: recursive
 
+      - name: Configure Pagefile
+        shell: pwsh
+        run: |
+          Set-CimInstance -Query "Select * from Win32_ComputerSystem" -Property @{AutomaticManagedPagefile = $False}
+          $pf = Get-CimInstance Win32_PageFileSetting
+          if ($pf) {
+            Set-CimInstance -InputObject $pf -Property @{InitialSize = 32768; MaximumSize = 32768}
+          } else {
+            New-CimInstance -ClassName Win32_PageFileSetting -Property @{Name = "C:\pagefile.sys"; InitialSize = 32768; MaximumSize = 32768}
+          }
+
       - name: Set up Python
         uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
         with:
@@ -35,10 +46,23 @@ jobs:
         id: libs
         uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
         with:
-          path: |
-            ${{ github.workspace }}\..\Libraries
-            ${{ github.workspace }}\..\ThirdParty
+          path: ${{ github.workspace }}\cached_libs
           key: win-libs-${{ hashFiles('Telegram/build/prepare/prepare.py', 'Telegram/build/prepare/win.bat') }}
+          restore-keys: |
+            win-libs-${{ hashFiles('Telegram/build/prepare/prepare.py', 'Telegram/build/prepare/win.bat') }}-
+            win-libs-
+
+      - name: Place restored ThirdParty libraries
+        if: steps.libs.outputs.cache-hit != ''
+        shell: pwsh
+        run: |
+          $parent = Split-Path $env:GITHUB_WORKSPACE
+          if (Test-Path "$env:GITHUB_WORKSPACE\cached_libs\Libraries") {
+            Move-Item "$env:GITHUB_WORKSPACE\cached_libs\Libraries" "$parent\Libraries" -Force
+          }
+          if (Test-Path "$env:GITHUB_WORKSPACE\cached_libs\ThirdParty") {
+            Move-Item "$env:GITHUB_WORKSPACE\cached_libs\ThirdParty" "$parent\ThirdParty" -Force
+          }
 
       - name: Install ATL for Breakpad
         shell: pwsh
@@ -76,13 +100,25 @@ jobs:
           echo %INCLUDE% | findstr /I /C:"%VCToolsInstallDir%atlmfc\include" >nul || (echo ATL include path is missing from INCLUDE & exit /b 1)
           Telegram\build\prepare\win.bat silent
 
+      - name: Stage ThirdParty libraries for cache
+        if: steps.libs.outputs.cache-hit != 'true'
+        shell: pwsh
+        run: |
+          $parent = Split-Path $env:GITHUB_WORKSPACE
+          $cacheDir = Join-Path $env:GITHUB_WORKSPACE "cached_libs"
+          New-Item -ItemType Directory -Force $cacheDir | Out-Null
+          if (Test-Path "$parent\Libraries") {
+            Copy-Item "$parent\Libraries" "$cacheDir\Libraries" -Recurse -Force
+          }
+          if (Test-Path "$parent\ThirdParty") {
+            Copy-Item "$parent\ThirdParty" "$cacheDir\ThirdParty" -Recurse -Force
+          }
+
       - name: Save ThirdParty libraries
         if: steps.libs.outputs.cache-hit != 'true'
         uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
         with:
-          path: |
-            ${{ github.workspace }}\..\Libraries
-            ${{ github.workspace }}\..\ThirdParty
+          path: ${{ github.workspace }}\cached_libs
           key: ${{ steps.libs.outputs.cache-primary-key }}
 
       # Plugin engine links against an embedded Python 3.11, expected at
@@ -122,7 +158,7 @@ jobs:
           cd Telegram
           call configure.bat x64 %CREDS%
           cd ..\out
-          msbuild Telegram.slnx /t:Telegram /p:Configuration=Release /m
+          msbuild Telegram.slnx /t:Telegram /p:Configuration=Release /m:2
 
       - name: Package
         shell: pwsh
