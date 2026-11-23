@@ -592,7 +592,7 @@ def run_proxy(stop_event: Optional[asyncio.Event] = None):
 
 def main():
     ap = argparse.ArgumentParser(
-        description='Telegram MTProto WebSocket Bridge Proxy')
+        description='Telegram WebSocket transport (Web client mode)')
     ap.add_argument('--port', type=int, default=1443,
                     help='Listen port (default 1443)')
     ap.add_argument('--host', type=str, default='127.0.0.1',
@@ -697,7 +697,7 @@ def main():
 
     console = logging.StreamHandler()
     console.setFormatter(log_fmt)
-    console.addFilter(DomainCensorFilter())
+    console.addFilter(DomainMaskFilter())
     root.addHandler(console)
 
     if args.log_file:
@@ -707,7 +707,7 @@ def main():
             log_max_mb=args.log_max_mb,
             backups=args.log_backups,
         )
-        fh.addFilter(DomainCensorFilter())
+        fh.addFilter(DomainMaskFilter())
         root.addHandler(fh)
 
     logging.getLogger('asyncio').setLevel(logging.WARNING)

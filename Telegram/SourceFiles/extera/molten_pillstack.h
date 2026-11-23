@@ -14,6 +14,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include <QtCore/QString>
 #include <QtCore/QRect>
 #include <QtGui/QColor>
+#include <QtGui/QWheelEvent>
 #include <vector>
 
 namespace Window {
@@ -48,6 +49,11 @@ enum class RamDisplayMode : int {
 	AppRss = 1,
 };
 
+enum class WeatherUnit : int {
+	Celsius = 0,
+	Fahrenheit = 1,
+};
+
 struct PillInfo {
 	PillType type = PillType::DcPing;
 	QString id;
@@ -74,6 +80,17 @@ void SetPillEnabled(PillType type, bool enabled);
 [[nodiscard]] QString CurrentWeatherText();
 [[nodiscard]] QString CurrentRatesText();
 
+// Weather location & unit helpers
+[[nodiscard]] WeatherUnit CurrentWeatherUnit();
+void SetWeatherUnit(WeatherUnit unit);
+void ToggleWeatherUnit();
+[[nodiscard]] QString CurrentWeatherCity();
+void SetWeatherLocation(const QString &city, const QString &lat, const QString &lon);
+
+// Rates customizable tickers helpers
+[[nodiscard]] QString CurrentRatesTickers();
+void SetRatesTickers(const QString &tickers);
+
 // Actions & Refreshers
 void TriggerDcPingProbe(Window::SessionController *controller = nullptr);
 void RefreshWeather(bool force = false);
@@ -90,7 +107,7 @@ void PaintPills(
 	int hoveredIndex = -1,
 	int pressedIndex = -1);
 
-// UI Widget for top bar / chat header integration
+// UI Widget for sidebar header integration
 class Widget final : public Ui::RpWidget {
 public:
 	Widget(QWidget *parent, Window::SessionController *controller = nullptr);
@@ -105,6 +122,7 @@ protected:
 	void leaveEventHook(QEvent *e) override;
 	void mousePressEvent(QMouseEvent *e) override;
 	void mouseReleaseEvent(QMouseEvent *e) override;
+	void wheelEvent(QWheelEvent *e) override;
 	void contextMenuEvent(QContextMenuEvent *e) override;
 
 private:
@@ -117,6 +135,11 @@ private:
 	std::vector<PillInfo> _pills;
 	int _hoveredIndex = -1;
 	int _pressedIndex = -1;
+	int _scrollX = 0;
+	int _maxScrollX = 0;
+	bool _dragging = false;
+	QPoint _dragStartPos;
+	int _dragStartScrollX = 0;
 	base::Timer _refreshTimer;
 };
 

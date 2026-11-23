@@ -1,9 +1,9 @@
 [Desktop Entry]
-Name=Telegram
-Comment=New era of messaging
+Name=MoltenGram Desktop
+Comment=MoltenGram Desktop messaging client
 TryExec=Telegram
 Exec=Telegram -- %U
-Icon=org.telegram.desktop
+Icon=moltengram-desktop
 Terminal=false
 StartupWMClass=TelegramDesktop
 Type=Application

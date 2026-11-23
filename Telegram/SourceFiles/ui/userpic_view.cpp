@@ -36,15 +36,17 @@ constexpr auto kMaxCorners = 28;
 int Corners = kMaxCorners;
 bool SingleRadius = false;
 
-[[nodiscard]] uint8 CornersKey() {
-	const auto md3Shape = Extera::AvatarShapes::ActiveShapeId();
+[[nodiscard]] uint8 CornersKey(int shapeId = -1) {
+	const auto md3Shape = (shapeId >= 0) ? shapeId : Extera::AvatarShapes::ActiveShapeId();
 	if (md3Shape > 0) {
 		return uint8(0x40 | (md3Shape & 0x3F)) | (SingleRadius ? 0x80 : 0);
 	}
 	return uint8(Corners) | (SingleRadius ? 0x80 : 0);
 }
 
-[[nodiscard]] QImage ApplyMd3ShapeMask(QImage &&image, int shapeId) {
+} // namespace
+
+QImage ApplyMd3ShapeMask(QImage &&image, int shapeId) {
 	if (image.isNull() || shapeId <= 0) {
 		return std::move(image);
 	}
@@ -62,8 +64,6 @@ bool SingleRadius = false;
 	return result;
 }
 
-} // namespace
-
 void SetUserpicCorners(int corners, bool singleRadius) {
 	Corners = std::clamp(corners, 0, kMaxCorners);
 	SingleRadius = singleRadius;
@@ -73,8 +73,8 @@ int UserpicCorners() {
 	return Corners;
 }
 
-void DrawUserpicShape(QPainter &p, QRectF rect) {
-	const auto md3Shape = Extera::AvatarShapes::ActiveShapeId();
+void DrawUserpicShape(QPainter &p, QRectF rect, int shapeId) {
+	const auto md3Shape = (shapeId >= 0) ? shapeId : Extera::AvatarShapes::ActiveShapeId();
 	if (md3Shape > 0) {
 		p.drawPath(Extera::AvatarShapes::ShapePath(md3Shape, rect));
 	} else if (Corners >= kMaxCorners) {
@@ -190,15 +190,17 @@ void ValidateUserpicCache(
 		const QImage *cloud,
 		const EmptyUserpic *empty,
 		int size,
-		PeerUserpicShape shape) {
+		PeerUserpicShape shape,
+		int customShapeId) {
 	Expects(cloud != nullptr || empty != nullptr);
 
 	const auto full = QSize(size, size);
 	const auto version = style::PaletteVersion();
 	const auto shapeValue = static_cast<uint32>(shape) & 3;
+	const auto cornersKey = CornersKey(customShapeId);
 	const auto regenerate = (view.cached.size() != QSize(size, size))
 		|| (view.shape != shapeValue)
-		|| (view.corners != CornersKey())
+		|| (view.corners != cornersKey)
 		|| (cloud && !view.empty.null())
 		|| (empty && empty != view.empty.get())
 		|| (empty && view.paletteVersion != version);
@@ -207,8 +209,8 @@ void ValidateUserpicCache(
 	}
 	view.empty = empty;
 	view.shape = shapeValue;
-	view.corners = CornersKey();
-	const auto md3Shape = Extera::AvatarShapes::ActiveShapeId();
+	view.corners = cornersKey;
+	const auto md3Shape = (customShapeId >= 0) ? customShapeId : Extera::AvatarShapes::ActiveShapeId();
 	const auto useMd3Shape = (md3Shape > 0)
 		&& ((shape == PeerUserpicShape::Auto)
 			|| (shape == PeerUserpicShape::Circle)

@@ -124,8 +124,19 @@ jobs:
             VERSION="${GITHUB_REF_NAME#v}"
           fi
           echo "VERSION=$VERSION" >> "$GITHUB_ENV"
-          APP=Telegram.app
-          BIN="$APP/Contents/MacOS/Telegram"
+          APP="$(find . -maxdepth 1 -name '*.app' | head -1)"
+          APP="${APP#./}"
+          if [ -z "$APP" ]; then
+            APP=MoltenGram.app
+            if [ ! -d "$APP" ]; then
+              APP=Telegram.app
+            fi
+          fi
+          echo "Found app bundle: $APP"
+          BIN="$APP/Contents/MacOS/$(defaults read "$(pwd)/$APP/Contents/Info.plist" CFBundleExecutable 2>/dev/null || echo MoltenGram)"
+          if [ ! -f "$BIN" ]; then
+            BIN="$APP/Contents/MacOS/Telegram"
+          fi
           mkdir -p "$APP/Contents/Frameworks" "$APP/Contents/Resources/python311/lib"
           otool -L "$BIN"
           LINKED=$(otool -L "$BIN" | awk 'tolower($1) ~ /python/ {print $1}' | head -1)

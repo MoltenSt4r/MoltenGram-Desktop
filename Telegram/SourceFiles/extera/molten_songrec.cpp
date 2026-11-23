@@ -30,6 +30,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/widgets/checkbox.h"
 #include "ui/widgets/fields/input_field.h"
 #include "ui/widgets/labels.h"
+#include "ui/wrap/slide_wrap.h"
 #include "ui/wrap/vertical_layout.h"
 #include "window/window_session_controller.h"
 
@@ -1293,35 +1294,40 @@ void Service::showResultBox(
 		not_null<Window::SessionController*> controller,
 		const TrackResult &result) {
 	controller->show(Box([=](not_null<Ui::GenericBox*> box) {
+		box->setWidth(st::boxWideWidth);
 		box->setTitle(rpl::single(u"Music Recognition Result"_q));
+		box->addTopButton(st::boxTitleClose, [=] { box->closeBox(); });
+
+		const auto container = box->verticalLayout();
 
 		// Cover Art Widget
-		const auto coverContainer = box->addRow(
-			object_ptr<Ui::RpWidget>(box));
-		coverContainer->resize(box->width(), 160);
+		const auto coverContainer = container->add(
+			object_ptr<Ui::RpWidget>(container));
+		coverContainer->resize(box->width(), 176);
 
 		auto coverState = box->lifetime().make_state<QImage>();
 
 		coverContainer->paintRequest() | rpl::on_next([=] {
 			auto p = QPainter(coverContainer);
 			auto hq = PainterHighQualityEnabler(p);
-			const int size = 140;
-			const QRect r((coverContainer->width() - size) / 2, 10, size, size);
+			const int size = 150;
+			const QRect r((coverContainer->width() - size) / 2, 8, size, size);
 
+			const auto isDark = (st::windowBg->c.lightness() < 128);
 			p.setPen(Qt::NoPen);
-			p.setBrush(QColor(36, 36, 44));
-			p.drawRoundedRect(r, 12, 12);
+			p.setBrush(isDark ? QColor(36, 36, 44) : QColor(235, 235, 240));
+			p.drawRoundedRect(r, 16, 16);
 
 			if (!coverState->isNull()) {
 				p.setClipPath([&] {
 					QPainterPath path;
-					path.addRoundedRect(r, 12, 12);
+					path.addRoundedRect(r, 16, 16);
 					return path;
 				}());
 				p.drawImage(r, *coverState);
 			} else {
-				p.setPen(QColor(180, 180, 190));
-				p.setFont(style::font(13, 0, 0));
+				p.setPen(isDark ? QColor(180, 180, 190) : QColor(90, 90, 100));
+				p.setFont(style::font(24, 0, 0));
 				p.drawText(r, Qt::AlignCenter, u"🎵"_q);
 			}
 		}, coverContainer->lifetime());
@@ -1335,37 +1341,53 @@ void Service::showResultBox(
 			}));
 		}
 
+		Ui::AddSkip(container, 8);
+
 		// Title Label
-		box->addRow(
+		container->add(
 			object_ptr<Ui::FlatLabel>(
-				box,
+				container,
 				rpl::single(result.title),
-				st::boxLabel));
+				st::defaultSubsectionTitle));
 
 		// Artist Label
 		if (!result.artist.isEmpty()) {
-			box->addRow(
+			Ui::AddSkip(container, 4);
+			container->add(
 				object_ptr<Ui::FlatLabel>(
-					box,
+					container,
 					rpl::single(u"Artist: "_q + result.artist),
-					st::boxLabel));
+					st::defaultFlatLabel));
 		}
 
 		// Album Label
 		if (!result.album.isEmpty()) {
-			box->addRow(
+			Ui::AddSkip(container, 4);
+			container->add(
 				object_ptr<Ui::FlatLabel>(
-					box,
+					container,
 					rpl::single(u"Album: "_q + result.album),
-					st::boxLabel));
+					st::boxDividerLabel));
 		}
 
-		// Action Buttons
-		box->addButton(rpl::single(u"Search on YouTube"_q), [=] {
+		// Action Buttons inside body
+		Ui::AddSkip(container, 16);
+		const auto ytBtn = container->add(
+			object_ptr<Ui::SettingsButton>(
+				container,
+				rpl::single(u"🔍  Search on YouTube"_q),
+				st::settingsButtonNoIcon));
+		ytBtn->setClickedCallback([=] {
 			QDesktopServices::openUrl(QUrl(result.searchUrl()));
 		});
 
-		box->addButton(rpl::single(u"Copy Info"_q), [=] {
+		Ui::AddSkip(container, 8);
+		const auto copyBtn = container->add(
+			object_ptr<Ui::SettingsButton>(
+				container,
+				rpl::single(u"📋  Copy Track Info"_q),
+				st::settingsButtonNoIcon));
+		copyBtn->setClickedCallback([=] {
 			QGuiApplication::clipboard()->setText(result.formatted());
 			Ui::Toast::Show(u"Copied to clipboard"_q);
 		});
@@ -1378,52 +1400,148 @@ void Service::showResultBox(
 
 void Service::showSettingsBox(not_null<Window::SessionController*> controller) {
 	controller->show(Box([=](not_null<Ui::GenericBox*> box) {
+		box->setWidth(st::boxWideWidth);
 		box->setTitle(rpl::single(u"Music Recognition (SongRec / AudD)"_q));
+		box->addTopButton(st::boxTitleClose, [=] { box->closeBox(); });
 
-		// Main Toggle
-		const auto enabledCheckbox = box->addRow(
+		const auto container = box->verticalLayout();
+
+		// 1. Main Engine Section
+		Ui::AddSubsectionTitle(container, rpl::single(u"Music Recognition Engine"_q));
+
+		const auto enabledCheckbox = container->add(
 			object_ptr<Ui::Checkbox>(
-				box,
+				container,
 				u"Enable SongRec music recognition"_q,
-				IsEnabled()));
+				IsEnabled(),
+				st::defaultCheckbox));
 
-		// Online high-res artwork toggle
-		const auto artworkCheckbox = box->addRow(
-			object_ptr<Ui::Checkbox>(
-				box,
-				u"Search high-resolution album artwork online"_q,
-				OnlineArtworkFallback()));
-
-		// AudD API Section
-		box->addRow(
+		container->add(
 			object_ptr<Ui::FlatLabel>(
-				box,
-				u"AudD Music Recognition API (Optional token)"_q,
-				st::boxLabel));
+				container,
+				rpl::single(u"Identify music from microphone, system audio, or audio files using acoustic fingerprints."_q),
+				st::boxDividerLabel));
 
-		const auto auddTokenField = box->addRow(
+		const auto engineWrap = container->add(
+			object_ptr<Ui::SlideWrap<Ui::VerticalLayout>>(
+				container,
+				object_ptr<Ui::VerticalLayout>(container)));
+
+		const auto engineOptions = engineWrap->entity();
+
+		Ui::AddSkip(engineOptions, 8);
+		Ui::AddSubsectionTitle(engineOptions, rpl::single(u"Recognition Provider"_q));
+
+		const auto providerGroup = std::make_shared<Ui::RadiobuttonGroup>(
+			static_cast<int>(CurrentProvider()));
+
+		const auto autoRadio = engineOptions->add(
+			object_ptr<Ui::Radiobutton>(
+				engineOptions,
+				providerGroup,
+				static_cast<int>(Provider::Auto),
+				u"Auto (Shazam fingerprint with AudD fallback)"_q));
+		autoRadio->setCheckAlignment(style::al_topleft);
+		Ui::AddSkip(engineOptions, 6);
+
+		const auto shazamRadio = engineOptions->add(
+			object_ptr<Ui::Radiobutton>(
+				engineOptions,
+				providerGroup,
+				static_cast<int>(Provider::Shazam),
+				u"Shazam (Acoustic Fingerprint)"_q));
+		shazamRadio->setCheckAlignment(style::al_topleft);
+		Ui::AddSkip(engineOptions, 6);
+
+		const auto auddRadio = engineOptions->add(
+			object_ptr<Ui::Radiobutton>(
+				engineOptions,
+				providerGroup,
+				static_cast<int>(Provider::AudD),
+				u"AudD (Cloud Recognition API)"_q));
+		auddRadio->setCheckAlignment(style::al_topleft);
+
+		providerGroup->setChangedCallback([=](int val) {
+			SetProvider(static_cast<Provider>(val));
+		});
+
+		Ui::AddSkip(engineOptions, 16);
+		const auto artworkCheckbox = engineOptions->add(
+			object_ptr<Ui::Checkbox>(
+				engineOptions,
+				u"Search High-Resolution Album Artwork Online"_q,
+				OnlineArtworkFallback(),
+				st::defaultCheckbox));
+
+		engineOptions->add(
+			object_ptr<Ui::FlatLabel>(
+				engineOptions,
+				rpl::single(u"Automatically search and download high-resolution cover artwork when identifying music."_q),
+				st::boxDividerLabel));
+
+		engineWrap->toggle(IsEnabled(), anim::type::instant);
+		enabledCheckbox->checkedChanges(
+		) | rpl::on_next([=](bool checked) {
+			engineWrap->toggle(checked, anim::type::normal);
+		}, enabledCheckbox->lifetime());
+
+		// 2. AudD API Section
+		Ui::AddSkip(container, 16);
+		Ui::AddSubsectionTitle(container, rpl::single(u"AudD API Configuration (Optional)"_q));
+		Ui::AddSkip(container, 8);
+
+		container->add(
+			object_ptr<Ui::FlatLabel>(
+				container,
+				rpl::single(u"Personal API token from audd.io for higher rate limits and extended library access."_q),
+				st::boxDividerLabel));
+
+		Ui::AddSkip(container, 8);
+		const auto auddTokenField = container->add(
 			object_ptr<Ui::InputField>(
-				box,
+				container,
 				st::defaultInputField,
-				rpl::single(u"AudD API Token"_q),
+				rpl::single(u"Enter AudD API Token"_q),
 				AudDApiToken()));
 
-		// Status / action
-		box->addRow(
-			object_ptr<Ui::FlatLabel>(
-				box,
-				Service::Instance().isRecognizing()
-					? u"Status: Listening / Identifying music..."_q
-					: u"Status: Ready"_q,
-				st::boxLabel));
+		// 3. Test Recognition Section
+		Ui::AddSkip(container, 16);
+		Ui::AddSubsectionTitle(container, rpl::single(u"Test & Identify Music"_q));
+		Ui::AddSkip(container, 8);
 
-		// Test Recognition Button
-		box->addButton(rpl::single(u"Listen with Mic"_q), [=] {
+		const auto statusText = Service::Instance().isRecognizing()
+			? u"Status: 🎙 Listening / Identifying music..."_q
+			: u"Status: Ready"_q;
+
+		container->add(
+			object_ptr<Ui::FlatLabel>(
+				container,
+				rpl::single(statusText),
+				st::defaultFlatLabel));
+
+		Ui::AddSkip(container, 8);
+		const auto micBtn = container->add(
+			object_ptr<Ui::SettingsButton>(
+				container,
+				rpl::single(u"🎙  Start Recognition (Microphone)"_q),
+				st::settingsButtonNoIcon));
+		micBtn->setClickedCallback([=] {
 			box->closeBox();
 			RecognizeFromMic(controller);
 		});
 
-		// Save Settings Button
+		Ui::AddSkip(container, 8);
+		const auto playBtn = container->add(
+			object_ptr<Ui::SettingsButton>(
+				container,
+				rpl::single(u"🔊  Recognize from Current Playback"_q),
+				st::settingsButtonNoIcon));
+		playBtn->setClickedCallback([=] {
+			box->closeBox();
+			RecognizeCurrentPlayback(controller);
+		});
+
+		// Footer Buttons: Clean Save and Cancel
 		box->addButton(tr::lng_settings_save(), [=] {
 			SetEnabled(enabledCheckbox->checked());
 			SetOnlineArtworkFallback(artworkCheckbox->checked());
@@ -1459,6 +1577,22 @@ void ShowResultBox(not_null<Window::SessionController*> controller, const TrackR
 
 void ShowSettingsBox(not_null<Window::SessionController*> controller) {
 	Service::Instance().showSettingsBox(controller);
+}
+
+void SetupSettings(
+		not_null<Ui::VerticalLayout*> container,
+		not_null<Window::SessionController*> controller) {
+	Ui::AddSubsectionTitle(container, rpl::single(u"Music Recognition (SongRec / AudD)"_q));
+
+	const auto button = container->add(
+		object_ptr<Ui::SettingsButton>(
+			container,
+			rpl::single(u"SongRec & AudD Music Identifier"_q),
+			st::settingsButtonNoIcon));
+
+	button->setClickedCallback([=] {
+		ShowSettingsBox(controller);
+	});
 }
 
 } // namespace Extera::SongRec

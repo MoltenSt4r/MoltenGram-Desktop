@@ -8,6 +8,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "data/data_session.h"
 
 #include "extera/extera_config.h"
+#include "extera/molten_chat_extras.h"
 #include "extera/molten_profile_metadata.h"
 
 #include <QtCore/QFile>
@@ -3507,10 +3508,31 @@ void Session::checkTTLs() {
 		}
 		expired.insert(expired.end(), items.begin(), items.end());
 	}
+	for (auto i = begin(_ttlMessages); i != end(_ttlMessages);) {
+		if (i->first > now) {
+			break;
+		}
+		i = _ttlMessages.erase(i);
+	}
 	if (!expired.empty()) {
-		notifyItemsAboutToBeDestroyed(expired);
-		for (const auto &item : expired) {
-			item->destroy();
+		if (Extera::SaveDeleted()) {
+			auto destroy = std::vector<not_null<HistoryItem*>>();
+			for (const auto &item : expired) {
+				if (!exteraSaveFor(item)) {
+					destroy.push_back(item);
+				} else {
+					Extera::ChatExtras::RetainMessage(item);
+					exteraMarkDeleted(item->fullId());
+					requestItemViewRefresh(item);
+				}
+			}
+			expired = std::move(destroy);
+		}
+		if (!expired.empty()) {
+			notifyItemsAboutToBeDestroyed(expired);
+			for (const auto &item : expired) {
+				item->destroy();
+			}
 		}
 	}
 	scheduleNextTTLs();
@@ -3649,6 +3671,11 @@ void Session::processMessagesDeleted(
 			affected->unknownMessageDeleted(messageId.v);
 		}
 	}
+	if (Extera::ChatExtras::DeletedReplyQuoteEnabled()) {
+		for (const auto &item : toDestroy) {
+			Extera::ChatExtras::RetainMessage(item);
+		}
+	}
 	if (Extera::SaveDeleted()) {
 		auto destroy = std::vector<not_null<HistoryItem*>>();
 		for (const auto &item : toDestroy) {
@@ -3683,6 +3710,11 @@ void Session::processNonChannelMessagesDeleted(const QVector<MTPint> &data) {
 			const auto history = item->history();
 			toDestroy.push_back(item);
 			historiesToCheck.emplace(history);
+		}
+	}
+	if (Extera::ChatExtras::DeletedReplyQuoteEnabled()) {
+		for (const auto &item : toDestroy) {
+			Extera::ChatExtras::RetainMessage(item);
 		}
 	}
 	if (Extera::SaveDeleted()) {

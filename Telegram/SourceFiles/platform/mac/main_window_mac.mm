@@ -33,6 +33,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "base/options.h"
 #include "boxes/peer_list_controllers.h"
 #include "boxes/about_box.h"
+#include "window/themes/window_theme.h"
 #include "lang/lang_keys.h"
 #include "base/platform/mac/base_utilities_mac.h"
 
@@ -73,6 +74,7 @@ public:
 	explicit Private(not_null<MainWindow*> window);
 
 	void setNativeWindow(NSWindow *window, NSView *view);
+	void updateAppearance(bool nightMode);
 	void initTouchBar(
 		NSWindow *window,
 		not_null<Window::Controller*> controller);
@@ -186,6 +188,18 @@ void MainWindow::Private::setNativeWindow(NSWindow *window, NSView *view) {
 	_public->_customTitleHeight = std::max(
 		int(base::SafeRound(full.size.height - inner.size.height)),
 		0);
+
+	updateAppearance(Window::Theme::IsNightMode());
+}
+
+void MainWindow::Private::updateAppearance(bool nightMode) {
+	if (!_nativeWindow) {
+		return;
+	}
+	if (@available(macOS 10.14, *)) {
+		[_nativeWindow setAppearance:[NSAppearance appearanceNamed:
+			nightMode ? NSAppearanceNameDarkAqua : NSAppearanceNameAqua]];
+	}
 }
 
 void MainWindow::Private::initTouchBar(
@@ -264,6 +278,11 @@ void MainWindow::initHook() {
 	Platform::GlobalMenuMarkdownState(
 	) | rpl::on_next([this](Ui::MarkdownEnabledState state) {
 		_private->updateMarkdownState(state);
+	}, lifetime());
+
+	Window::Theme::IsNightModeValue(
+	) | rpl::on_next([this](bool nightMode) {
+		_private->updateAppearance(nightMode);
 	}, lifetime());
 }
 

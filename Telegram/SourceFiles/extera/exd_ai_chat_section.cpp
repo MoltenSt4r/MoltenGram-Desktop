@@ -656,6 +656,9 @@ void AiChatWidget::showMenu() {
 	_menu->addAction(tr::lng_extera_ai_clear(tr::now), [] {
 		Extera::AiChatClear();
 	}, &st::menuIconDelete);
+	_menu->addAction(rpl::single(u"AI Settings & Providers"_q), [=] {
+		Extera::ShowAiSettingsBox(controller());
+	}, &st::menuIconSettings);
 	_menu->addAction(tr::lng_extera_ai_key(tr::now), [=] {
 		Extera::ShowKeyBox(controller());
 	}, &st::menuIconPremium);

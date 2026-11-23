@@ -154,7 +154,7 @@ Icon=moltengram-desktop
 Terminal=false
 Categories=Network;InstantMessaging;Chat;
 MimeType=x-scheme-handler/tg;application/x-moltengram-plugin;
-StartupWMClass=MoltenGram Desktop
+StartupWMClass=TelegramDesktop
 EOF
 		cat > "$MIME/moltengram-plugin.xml" <<EOF
 <?xml version="1.0" encoding="UTF-8"?>

@@ -106,7 +106,6 @@ jobs:
           python3 -m pip install --disable-pip-version-check --target pkgdeps/site-packages \
             --platform manylinux2014_x86_64 --python-version 3.11 --implementation cp --abi cp311 --abi abi3 --abi none \
             --only-binary=:all: requests==2.32.3 beautifulsoup4==4.12.3 lxml==5.3.0 pillow==11.0.0 PyYAML==6.0.2 packaging==24.2
-          python3 -m pip install --disable-pip-version-check --target pkgdeps/tools patchelf==0.17.2.1
 
       - name: Package
         run: |
@@ -142,19 +141,15 @@ jobs:
               cp -r pkgdeps/site-packages/. "$PKG/python/site-packages/"
               cp -r Telegram/SourceFiles/extera/tgws/. "$PKG/python/tgws/"
               find "$PKG/python" -name "__pycache__" -type d -prune -exec rm -rf {} +
-              PATCHELF=$(find pkgdeps/tools -type f -name patchelf | head -1)
-              if [ -n "$PATCHELF" ]; then
-                chmod +x "$PATCHELF"
-                "$PATCHELF" --set-rpath "\$ORIGIN/lib" "$PKG/MoltenGram-Desktop-bin"
-              fi
               cat > "$PKG/MoltenGram-Desktop" <<SH
           #!/bin/sh
-          DIR="\$(cd "\$(dirname "\$0")" && pwd)"
+          DIR="\$(dirname "\$(readlink -f "\$0")")"
           export LD_LIBRARY_PATH="\$DIR/lib\${LD_LIBRARY_PATH:+:\$LD_LIBRARY_PATH}"
           export PYTHONHOME="\$DIR/python311"
           export PYTHONNOUSERSITE=1
           exec "\$DIR/MoltenGram-Desktop-bin" "\$@"
           SH
+              printf '[Desktop Entry]\nType=Application\nName=MoltenGram Desktop\nComment=Telegram client\nExec=MoltenGram-Desktop -- %%u\nIcon=moltengram-desktop\nTerminal=false\nCategories=Network;InstantMessaging;Chat;\nMimeType=x-scheme-handler/tg;application/x-moltengram-plugin;\nStartupWMClass=TelegramDesktop\n' > "$PKG/moltengram-desktop.desktop"
               chmod +x "$PKG/MoltenGram-Desktop" "$PKG/MoltenGram-Desktop-bin"
               PYTHONHOME="$PKG/python311" PYTHONNOUSERSITE=1 LD_LIBRARY_PATH="$PKG/lib" python3.11 -c "
           import sys

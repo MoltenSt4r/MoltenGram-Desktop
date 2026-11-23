@@ -8,6 +8,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "core/core_settings.h"
 
 #include "extera/extera_config.h"
+#include "extera/molten_device_spoof.h"
 
 #include "base/platform/base_platform_info.h"
 #include "calls/group/calls_group_common.h"
@@ -1604,7 +1605,8 @@ void Settings::setThirdColumnWidth(int width) {
 
 QString Settings::deviceModel() const {
 	const auto custom = customDeviceModel();
-	return custom.isEmpty() ? Platform::DeviceModelPretty() : custom;
+	const auto base = custom.isEmpty() ? Platform::DeviceModelPretty() : custom;
+	return Extera::DeviceSpoof::ApplyDeviceModel(base);
 }
 
 rpl::producer<QString> Settings::deviceModelChanges() const {

@@ -19,6 +19,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include <optional>
 
 class QPainter;
+class PeerData;
 
 namespace Ui {
 class VerticalLayout;
@@ -96,6 +97,7 @@ inline constexpr int kShapesCount = 44;
 [[nodiscard]] int ShapeForPeerType(PeerType type);
 void SetShapeForPeerType(PeerType type, int shapeId);
 [[nodiscard]] int ActiveShapeId();
+[[nodiscard]] int ShapeForPeer(not_null<const PeerData*> peer);
 
 void PaintStoryRing(
 	QPainter &p,

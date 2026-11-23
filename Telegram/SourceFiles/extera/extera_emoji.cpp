@@ -130,3 +130,41 @@ void ReapplyLocalPremiumEmoji(not_null<HistoryItem*> item) {
 }
 
 } // namespace Extera
+
+namespace Extera::NotoEmoji {
+
+bool Enabled() {
+	return Bool(u"noto_animated_emoji"_q);
+}
+
+QString EmojiToCodePoints(const QString &emoji) {
+	if (emoji.isEmpty()) {
+		return QString();
+	}
+	auto cleaned = emoji;
+	cleaned.remove(QChar(0xFE0F));
+	QStringList parts;
+	const auto ucs4 = cleaned.toUcs4();
+	for (const auto cp : ucs4) {
+		parts.append(QString::number(cp, 16).toLower());
+	}
+	return parts.join(u'_');
+}
+
+QString WebpUrl(const QString &emoji) {
+	const auto points = EmojiToCodePoints(emoji);
+	if (points.isEmpty()) {
+		return QString();
+	}
+	return u"https://fonts.gstatic.com/s/e/notoemoji/latest/"_q + points + u"/512.webp"_q;
+}
+
+QString LottieUrl(const QString &emoji) {
+	const auto points = EmojiToCodePoints(emoji);
+	if (points.isEmpty()) {
+		return QString();
+	}
+	return u"https://fonts.gstatic.com/s/e/notoemoji/latest/"_q + points + u"/lottie.json"_q;
+}
+
+} // namespace Extera::NotoEmoji

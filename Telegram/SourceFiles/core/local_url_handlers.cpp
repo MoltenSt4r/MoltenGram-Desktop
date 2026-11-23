@@ -2079,6 +2079,20 @@ bool OpenChatById(
 const std::vector<LocalUrlHandler> &LocalUrlHandlers() {
 	static auto Result = std::vector<LocalUrlHandler>{
 		{
+			u"^moltengram/?(.*)?$"_q,
+			[](Window::SessionController *controller, const Match &match, const QVariant &context) {
+				const auto path = match->captured(1);
+				return TryRouterForLocalUrl(controller, u"moltengram/"_q + path);
+			}
+		},
+		{
+			u"^molten/?(.*)?$"_q,
+			[](Window::SessionController *controller, const Match &match, const QVariant &context) {
+				const auto path = match->captured(1);
+				return TryRouterForLocalUrl(controller, u"molten/"_q + path);
+			}
+		},
+		{
 			u"^plugin/?\\?id=([a-zA-Z0-9\\.\\_\\-]+)(&|$)"_q,
 			ShowExteraPlugin
 		},

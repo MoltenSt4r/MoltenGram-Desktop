@@ -7,7 +7,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "history/view/history_view_top_bar_widget.h"
 
-#include "extera/molten_pillstack.h"
 
 #include "history/history.h"
 #include "history/view/history_view_send_action.h"
@@ -306,7 +305,6 @@ TopBarWidget::TopBarWidget(
 	_menuToggle->setAccessibleName(tr::lng_chat_menu(tr::now));
 	_back->setAccessibleName(tr::lng_go_back(tr::now));
 	_cancelChoose->setAccessibleName(tr::lng_cancel(tr::now));
-	_pillStack.create(this, _controller);
 }
 
 TopBarWidget::~TopBarWidget() = default;
@@ -1436,29 +1434,6 @@ void TopBarWidget::updateControlsGeometry() {
 	_search->moveToRight(_rightTaken, otherButtonsTop);
 	if (!_search->isHidden()) {
 		_rightTaken += _search->width() + st::topBarCallSkip;
-	}
-	if (_pillStack) {
-		const auto showPills = Extera::PillStack::Enabled()
-			&& !hasSelected
-			&& !_searchMode
-			&& (width() - _leftTaken - _rightTaken > 260);
-		_pillStack->setVisible(showPills);
-		if (showPills) {
-			const auto maxW = std::max(
-				0,
-				width() - _leftTaken - _rightTaken - 140);
-			const auto pillW = std::min(_pillStack->naturalWidth(), maxW);
-			if (pillW > 40) {
-				const auto pillH = 28;
-				_pillStack->resize(pillW, pillH);
-				_pillStack->moveToRight(
-					_rightTaken,
-					otherButtonsTop + (st::topBarHeight - pillH) / 2);
-				_rightTaken += pillW + st::topBarCallSkip;
-			} else {
-				_pillStack->hide();
-			}
-		}
 	}
 
 	updateMembersShowArea();

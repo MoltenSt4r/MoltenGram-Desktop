@@ -29,6 +29,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "styles/style_settings.h"
 #include "ui/effects/reaction_fly_animation.h"
 #include "ui/layers/generic_box.h"
+#include "ui/painter.h"
 #include "ui/text/text_entity.h"
 #include "ui/vertical_list.h"
 #include "ui/widgets/buttons.h"
@@ -48,6 +49,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include <QtCore/QStandardPaths>
 #include <QtGui/QClipboard>
 #include <QtGui/QGuiApplication>
+#include <QtGui/QMouseEvent>
 
 #include <algorithm>
 #include <map>
@@ -248,15 +250,16 @@ void SetDefaultReactionEmoji(const QString &emoji) {
 }
 
 QString ActionName(DoubleTapAction action) {
+	const auto isRu = Lang::LanguageIdOrDefault(Lang::Id()).startsWith(u"ru"_q);
 	switch (action) {
-	case DoubleTapAction::None: return u"None"_q;
-	case DoubleTapAction::Reaction: return u"Quick Reaction"_q;
-	case DoubleTapAction::Reply: return u"Reply"_q;
-	case DoubleTapAction::Translate: return u"Translate"_q;
-	case DoubleTapAction::Copy: return u"Copy Text"_q;
-	case DoubleTapAction::ForwardToSaved: return u"Forward to Saved Messages"_q;
+	case DoubleTapAction::None: return isRu ? u"Отключено"_q : u"None"_q;
+	case DoubleTapAction::Reaction: return isRu ? u"Быстрая реакция"_q : u"Quick Reaction"_q;
+	case DoubleTapAction::Reply: return isRu ? u"Ответить"_q : u"Reply"_q;
+	case DoubleTapAction::Translate: return isRu ? u"Перевести"_q : u"Translate"_q;
+	case DoubleTapAction::Copy: return isRu ? u"Копировать текст"_q : u"Copy Text"_q;
+	case DoubleTapAction::ForwardToSaved: return isRu ? u"В «Избранное»"_q : u"Forward to Saved Messages"_q;
 	}
-	return u"None"_q;
+	return isRu ? u"Отключено"_q : u"None"_q;
 }
 
 QString ActionId(DoubleTapAction action) {
@@ -624,6 +627,12 @@ void AddDoubleTapSettings(
 			DoubleTapEnabled(),
 			st::defaultCheckbox));
 
+	container->add(
+		object_ptr<Ui::FlatLabel>(
+			container,
+			rpl::single(u"Quickly trigger reactions, replies, translation, or copying with a double-tap on messages."_q),
+			st::boxDividerLabel));
+
 	const auto optionsWrap = container->add(
 		object_ptr<Ui::SlideWrap<Ui::VerticalLayout>>(
 			container,
@@ -632,23 +641,21 @@ void AddDoubleTapSettings(
 	const auto options = optionsWrap->entity();
 
 	// Incoming Action Selection
-	Ui::AddSkip(options, 6);
-	options->add(
-		object_ptr<Ui::FlatLabel>(
-			options,
-			rpl::single(u"Action for Incoming Messages:"_q),
-			st::defaultFlatLabel));
+	Ui::AddSkip(options, 10);
+	Ui::AddSubsectionTitle(options, rpl::single(u"Incoming Messages Action"_q));
 
 	const auto incomingRadioGroup = std::make_shared<Ui::RadiobuttonGroup>(
 		ActionToInt(IncomingAction()));
 
 	for (const auto action : AllActions()) {
-		options->add(
+		const auto btn = options->add(
 			object_ptr<Ui::Radiobutton>(
 				options,
 				incomingRadioGroup,
 				ActionToInt(action),
 				ActionName(action)));
+		btn->setCheckAlignment(style::al_topleft);
+		Ui::AddSkip(options, 2);
 	}
 
 	incomingRadioGroup->setChangedCallback([=](int val) {
@@ -656,23 +663,21 @@ void AddDoubleTapSettings(
 	});
 
 	// Outgoing Action Selection
-	Ui::AddSkip(options, 10);
-	options->add(
-		object_ptr<Ui::FlatLabel>(
-			options,
-			rpl::single(u"Action for Outgoing Messages:"_q),
-			st::defaultFlatLabel));
+	Ui::AddSkip(options, 12);
+	Ui::AddSubsectionTitle(options, rpl::single(u"Outgoing Messages Action"_q));
 
 	const auto outgoingRadioGroup = std::make_shared<Ui::RadiobuttonGroup>(
 		ActionToInt(OutgoingAction()));
 
 	for (const auto action : AllActions()) {
-		options->add(
+		const auto btn = options->add(
 			object_ptr<Ui::Radiobutton>(
 				options,
 				outgoingRadioGroup,
 				ActionToInt(action),
 				ActionName(action)));
+		btn->setCheckAlignment(style::al_topleft);
+		Ui::AddSkip(options, 6);
 	}
 
 	outgoingRadioGroup->setChangedCallback([=](int val) {
@@ -680,44 +685,85 @@ void AddDoubleTapSettings(
 	});
 
 	// Quick Reaction Emoji
-	Ui::AddSkip(options, 10);
+	Ui::AddSkip(options, 16);
+	Ui::AddSubsectionTitle(options, rpl::single(u"Quick Reaction Emoji Preset"_q));
+	Ui::AddSkip(options, 8);
 	options->add(
 		object_ptr<Ui::FlatLabel>(
 			options,
-			rpl::single(u"Quick Reaction Emoji:"_q),
-			st::defaultFlatLabel));
+			rpl::single(u"Select a reaction preset or enter a custom emoji:"_q),
+			st::boxDividerLabel));
+
+	Ui::AddSkip(options, 8);
+
+	const auto emojis = std::vector<QString>{
+		u"👍"_q, u"❤️"_q, u"🔥"_q, u"🎉"_q, u"👏"_q, u"😂"_q, u"⚡"_q, u"🥰"_q
+	};
 
 	const auto reactionField = options->add(
 		object_ptr<Ui::InputField>(
 			options,
 			st::defaultInputField,
-			rpl::single(u"Emoji (default: 👍)"_q),
+			rpl::single(u"Custom reaction emoji (default: 👍)"_q),
 			DefaultReactionEmoji()));
+
+	Ui::AddSkip(options, 8);
+
+	const auto emojiChips = options->add(
+		object_ptr<Ui::RpWidget>(options));
+	const auto chipSize = 40;
+	const auto chipGap = 8;
+	emojiChips->resize(options->width(), chipSize + 8);
+	emojiChips->setCursor(style::cur_pointer);
+
+	emojiChips->paintRequest() | rpl::on_next([=] {
+		auto p = QPainter(emojiChips);
+		PainterHighQualityEnabler hq(p);
+		const auto current = DefaultReactionEmoji();
+		const auto isDark = (st::windowBg->c.lightness() < 128);
+		for (size_t i = 0; i < emojis.size(); ++i) {
+			const auto x = int(i) * (chipSize + chipGap);
+			const auto r = QRect(x, 4, chipSize, chipSize);
+			const bool isSelected = (emojis[i] == current);
+			if (isSelected) {
+				p.setPen(QPen(st::windowBgActive->c, 2));
+				p.setBrush(st::windowBgActive->c);
+				p.drawRoundedRect(r, 20, 20);
+			} else {
+				const auto chipBg = isDark ? QColor(255, 255, 255, 18) : QColor(0, 0, 0, 10);
+				const auto chipBorder = isDark ? QColor(255, 255, 255, 36) : QColor(0, 0, 0, 24);
+				p.setPen(QPen(chipBorder, 1));
+				p.setBrush(chipBg);
+				p.drawRoundedRect(r, 20, 20);
+			}
+			p.setFont(style::font(16, 0, 0));
+			p.setPen(isSelected ? Qt::white : st::windowFg->c);
+			p.drawText(r, Qt::AlignCenter, emojis[i]);
+		}
+	}, emojiChips->lifetime());
+
+	emojiChips->events() | rpl::on_next([=](not_null<QEvent*> e) {
+		if (e->type() != QEvent::MouseButtonRelease) {
+			return;
+		}
+		const auto me = static_cast<QMouseEvent*>(e.get());
+		const auto idx = int(me->pos().x()) / (chipSize + chipGap);
+		if (idx >= 0 && size_t(idx) < emojis.size()) {
+			SetDefaultReactionEmoji(emojis[idx]);
+			reactionField->setText(emojis[idx]);
+			emojiChips->update();
+			controller->showToast(u"Selected quick reaction: "_q + emojis[idx]);
+		}
+	}, emojiChips->lifetime());
 
 	reactionField->changes(
 	) | rpl::on_next([=] {
 		const auto text = reactionField->getLastText().trimmed();
 		if (!text.isEmpty()) {
 			SetDefaultReactionEmoji(text);
+			emojiChips->update();
 		}
 	}, reactionField->lifetime());
-
-	// Quick preset buttons: 👍, ❤️, 🔥, 🎉, 👏, 😂
-	const auto emojis = std::vector<QString>{
-		u"👍"_q, u"❤️"_q, u"🔥"_q, u"🎉"_q, u"👏"_q, u"😂"_q, u"⚡"_q
-	};
-	const auto quickEmojiButtons = options->add(
-		object_ptr<Ui::SettingsButton>(
-			options,
-			rpl::single(u"Cycle Preset Reaction: 👍  ❤️  🔥  🎉  👏  😂  ⚡"_q),
-			st::settingsButtonNoIcon));
-	quickEmojiButtons->setClickedCallback([=] {
-		static int nextIdx = 0;
-		nextIdx = (nextIdx + 1) % emojis.size();
-		SetDefaultReactionEmoji(emojis[nextIdx]);
-		reactionField->setText(emojis[nextIdx]);
-		controller->showToast(u"Selected quick reaction: "_q + emojis[nextIdx]);
-	});
 
 	optionsWrap->toggle(DoubleTapEnabled(), anim::type::instant);
 	enableCheckbox->checkedChanges(
@@ -750,7 +796,7 @@ void AddDeletedReplyQuoteSettings(
 			rpl::single(u"When an author deletes their message, replies still display the retained quote snippet and sender name instead of 'Deleted message'."_q),
 			st::boxDividerLabel));
 
-	Ui::AddSkip(container, 8);
+	Ui::AddSkip(container, 16);
 
 	const auto rewriteCheckbox = container->add(
 		object_ptr<Ui::Checkbox>(
@@ -770,13 +816,15 @@ void AddDeletedReplyQuoteSettings(
 			rpl::single(u"Format replies to deleted messages with a preserved quote blockquote header and original sender name."_q),
 			st::boxDividerLabel));
 
-	Ui::AddSkip(container, 10);
+	Ui::AddSkip(container, 16);
 
 	const auto cacheLabel = container->add(
 		object_ptr<Ui::FlatLabel>(
 			container,
 			rpl::single(QString(u"Preserved quotes in cache: %1"_q).arg(RetainedQuotesCount())),
 			st::defaultFlatLabel));
+
+	Ui::AddSkip(container, 8);
 
 	const auto clearButton = container->add(
 		object_ptr<Ui::SettingsButton>(
@@ -809,12 +857,15 @@ void SetupSettings(
 
 void ShowSettingsBox(not_null<Window::SessionController*> controller) {
 	controller->show(Box([=](not_null<Ui::GenericBox*> box) {
+		box->setWidth(st::boxWideWidth);
 		box->setTitle(rpl::single(u"Chat Extras & Gestures"_q));
 		box->addTopButton(st::boxTitleClose, [=] { box->closeBox(); });
 
 		const auto container = box->verticalLayout();
 
 		AddDoubleTapSettings(container, controller);
+		Ui::AddSkip(container, 16);
+		Ui::AddDivider(container);
 		Ui::AddSkip(container, 16);
 		AddDeletedReplyQuoteSettings(container, controller);
 

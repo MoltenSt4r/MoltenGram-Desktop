@@ -7,6 +7,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "extera/molten_avatar_shapes.h"
 
+#include "data/data_peer.h"
 #include "extera/extera_config.h"
 #include "extera/molten_media_carousel.h"
 #include "lang/lang_keys.h"
@@ -91,6 +92,7 @@ constexpr auto kUnrounded = CornerRounding{ 0., 0. };
 constexpr auto kRound15 = CornerRounding{ 0.15, 0. };
 constexpr auto kRound20 = CornerRounding{ 0.20, 0. };
 constexpr auto kRound30 = CornerRounding{ 0.30, 0. };
+constexpr auto kSquircle = CornerRounding{ 0.32, 0.72 };
 constexpr auto kRound50 = CornerRounding{ 0.50, 0. };
 constexpr auto kRound100 = CornerRounding{ 1.00, 0. };
 
@@ -383,7 +385,7 @@ struct PolySpec {
 			// Smoothing blends the cubic handle slightly further toward vertex.
 			const auto handle = std::min(
 				cg.effCut,
-				arcHandle * (1. + 0.18 * cg.smoothing));
+				arcHandle * (1. + 0.55 * cg.smoothing));
 			const auto c1 = pStart - cg.u1 * handle;
 			const auto c2 = pEnd - cg.u2 * handle;
 			path.cubicTo(c1.x, c1.y, c2.x, c2.y, pEnd.x, pEnd.y);
@@ -409,7 +411,7 @@ struct PolySpec {
 		return s;
 	}
 	case kShapeSquare:
-		return RectanglePolygon(1., 1., kRound30);
+		return RectanglePolygon(1., 1., kSquircle);
 	case kShapeSlanted:
 		return CustomPolygon({
 			{ { 0.926, 0.970 }, { 0.189, 0.811 } },
@@ -830,6 +832,21 @@ int ActiveShapeId() {
 	return ShapeForPeerType(PeerType::User);
 }
 
+int ShapeForPeer(not_null<const PeerData*> peer) {
+	if (peer->isSelf()) {
+		return ShapeForPeerType(PeerType::Self);
+	} else if (peer->isBot()) {
+		return ShapeForPeerType(PeerType::Bot);
+	} else if (peer->isUser()) {
+		return ShapeForPeerType(PeerType::User);
+	} else if (peer->isChat() || peer->isMegagroup()) {
+		return ShapeForPeerType(PeerType::Group);
+	} else if (peer->isChannel()) {
+		return ShapeForPeerType(PeerType::Channel);
+	}
+	return ShapeForPeerType(PeerType::User);
+}
+
 void PaintStoryRing(
 		QPainter &p,
 		QRectF rect,
@@ -853,7 +870,7 @@ void ShowShapePickerBox(
 	controller->show(Box([=](not_null<Ui::GenericBox*> box) {
 		box->setTitle(rpl::single(
 			u"Avatar shape — "_q + PeerTypeName(type)));
-		box->setWidth(style::ConvertScale(400));
+		box->setWidth(style::ConvertScale(440));
 
 		const auto selected = box->lifetime().make_state<rpl::variable<int>>(
 			ShapeForPeerType(type));
@@ -861,10 +878,10 @@ void ShowShapePickerBox(
 
 		constexpr auto kCols = 4;
 		constexpr auto kRows = (kShapesCount + kCols - 1) / kCols;
-		const auto cellW = style::ConvertScale(86);
-		const auto cellH = style::ConvertScale(92);
+		const auto cellW = style::ConvertScale(94);
+		const auto cellH = style::ConvertScale(98);
 		const auto gap = style::ConvertScale(6);
-		const auto padX = style::ConvertScale(14);
+		const auto padX = style::ConvertScale(16);
 		const auto padY = style::ConvertScale(8);
 
 		const auto grid = container->add(
@@ -899,7 +916,7 @@ void ShowShapePickerBox(
 					p.setBrush(fill);
 					p.setPen(Qt::NoPen);
 				}
-				const auto cardRadius = style::ConvertScale(14.);
+				const auto cardRadius = style::ConvertScale(16.);
 				p.drawRoundedRect(r, cardRadius, cardRadius);
 
 				const auto shapeSide = style::ConvertScale(46.);

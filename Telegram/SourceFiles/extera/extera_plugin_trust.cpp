@@ -170,7 +170,7 @@ void Search(
 std::vector<Source> Sources() {
 	auto result = std::vector<Source>{
 		{ .id = 2189715950ULL, .username = u"exteraPluginsSup"_q },
-		{ .id = 3914431400ULL, .username = u"exDesktopPlugins"_q },
+		{ .id = 3914431400ULL, .username = u"MoltenGramPlugins"_q },
 	};
 	if (const auto remote = Extera::TrustedSources()) {
 		for (const auto &source : *remote) {

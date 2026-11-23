@@ -90,13 +90,13 @@ def get_link_host(host: str) -> Optional[str]:
         return host
 
 
-class DomainCensorFilter(logging.Filter):
+class DomainMaskFilter(logging.Filter):
     domain_pattern = re.compile(
         r'(?<![\w-])(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)+'
         r'[a-zA-Z]{2,}(?![\w-])'
     )
 
-    def _censor_match(self, match):
+    def _mask_match(self, match):
         domain = match.group()
         normalized = domain.casefold().rstrip('.')
         if normalized == 'telegram.org' or normalized.endswith('.telegram.org') or normalized.endswith('.log'):
@@ -111,9 +111,12 @@ class DomainCensorFilter(logging.Filter):
         )
 
     def filter(self, record):
-        record.msg = self.domain_pattern.sub(self._censor_match, record.getMessage())
+        record.msg = self.domain_pattern.sub(self._mask_match, record.getMessage())
         record.args = ()
         return True
+
+
+DomainCensorFilter = DomainMaskFilter
 
 
 class _PinnedHTTPSHandler(urllib.request.HTTPSHandler):

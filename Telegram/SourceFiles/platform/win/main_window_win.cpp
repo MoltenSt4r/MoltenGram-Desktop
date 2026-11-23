@@ -716,7 +716,14 @@ void MainWindow::validateWindowTheme(bool native, bool night) {
 
 	const auto updateStyle = [&] {
 		static const auto kSystemVersion = QOperatingSystemVersion::current();
-		if (kSystemVersion.microVersion() >= 18875 && Dlls::SetWindowCompositionAttribute) {
+		if (kSystemVersion.microVersion() >= 18985) {
+			static const auto kDWMWA_USE_IMMERSIVE_DARK_MODE = DWORD(20);
+			DwmSetWindowAttribute(
+				_hWnd,
+				kDWMWA_USE_IMMERSIVE_DARK_MODE,
+				&darkValue,
+				sizeof(darkValue));
+		} else if (kSystemVersion.microVersion() >= 18875 && Dlls::SetWindowCompositionAttribute) {
 			Dlls::WINDOWCOMPOSITIONATTRIBDATA data = {
 				Dlls::WINDOWCOMPOSITIONATTRIB::WCA_USEDARKMODECOLORS,
 				&darkValue,
@@ -724,9 +731,7 @@ void MainWindow::validateWindowTheme(bool native, bool night) {
 			};
 			Dlls::SetWindowCompositionAttribute(_hWnd, &data);
 		} else if (kSystemVersion.microVersion() >= 17763) {
-			static const auto kDWMWA_USE_IMMERSIVE_DARK_MODE = (kSystemVersion.microVersion() >= 18985)
-				? DWORD(20)
-				: DWORD(19);
+			static const auto kDWMWA_USE_IMMERSIVE_DARK_MODE = DWORD(19);
 			DwmSetWindowAttribute(
 				_hWnd,
 				kDWMWA_USE_IMMERSIVE_DARK_MODE,

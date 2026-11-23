@@ -44,7 +44,9 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include <QtGui/QPen>
 #include <QtGui/QBrush>
 #include <QtGui/QColor>
+#include <QtGui/QLinearGradient>
 #include <QtGui/QMouseEvent>
+#include <QtGui/QWheelEvent>
 #include <QtGui/QContextMenuEvent>
 #include <QtWidgets/QApplication>
 #include <QtWidgets/QMenu>
@@ -81,7 +83,9 @@ const auto kRatesKey = u"pillstack_rates"_q;
 const auto kWeatherCityKey = u"pillstack_location_city"_q;
 const auto kWeatherLatKey = u"pillstack_location_lat"_q;
 const auto kWeatherLonKey = u"pillstack_location_lon"_q;
+const auto kWeatherUnitKey = u"pillstack_weather_unit"_q;
 const auto kRatePairKey = u"pillstack_rate_pair"_q;
+const auto kRateTickersKey = u"pillstack_rate_tickers"_q;
 const auto kNetSpeedModeKey = u"pillstack_speed_mode"_q;
 const auto kRamModeKey = u"pillstack_ram_mode"_q;
 
@@ -346,16 +350,47 @@ struct RatesState {
 	double btcUsd = 94250.0;
 	double tonUsd = 5.45;
 	double ethUsd = 3150.0;
+	double solUsd = 185.0;
+	double dogeUsd = 0.38;
+	double notUsd = 0.0072;
 	double usdRub = 98.5;
 	double eurRub = 104.2;
 	double eurUsd = 1.08;
-	int activePair = 0;
+	int activePairIndex = 0;
 	bool inFlight = false;
 };
 
 [[nodiscard]] RatesState &GetRatesState() {
 	static auto state = RatesState();
 	return state;
+}
+
+[[nodiscard]] QString FormatTickerValue(const QString &rawTicker, const RatesState &state) {
+	const auto ticker = rawTicker.trimmed().toUpper();
+	if (ticker == u"BTC"_q || ticker == u"BTC/USD"_q || ticker == u"BITCOIN"_q) {
+		return (state.btcUsd >= 1000.0)
+			? QString("₿ $%1k").arg(state.btcUsd / 1000.0, 0, 'f', 1)
+			: QString("₿ $%1").arg(qRound(state.btcUsd));
+	} else if (ticker == u"TON"_q || ticker == u"TON/USD"_q || ticker == u"TONCOIN"_q) {
+		return QString("💎 $%1").arg(state.tonUsd, 0, 'f', 2);
+	} else if (ticker == u"ETH"_q || ticker == u"ETH/USD"_q || ticker == u"ETHEREUM"_q) {
+		return (state.ethUsd >= 1000.0)
+			? QString("Ξ $%1k").arg(state.ethUsd / 1000.0, 0, 'f', 1)
+			: QString("Ξ $%1").arg(qRound(state.ethUsd));
+	} else if (ticker == u"SOL"_q || ticker == u"SOL/USD"_q || ticker == u"SOLANA"_q) {
+		return QString("◎ $%1").arg(state.solUsd, 0, 'f', 1);
+	} else if (ticker == u"DOGE"_q || ticker == u"DOGE/USD"_q || ticker == u"DOGECOIN"_q) {
+		return QString("🐶 $%1").arg(state.dogeUsd, 0, 'f', 3);
+	} else if (ticker == u"NOT"_q || ticker == u"NOT/USD"_q || ticker == u"NOTCOIN"_q) {
+		return QString("🦔 $%1").arg(state.notUsd, 0, 'f', 4);
+	} else if (ticker == u"USD/RUB"_q || ticker == u"USDRUB"_q) {
+		return QString("$ %1₽").arg(state.usdRub, 0, 'f', 1);
+	} else if (ticker == u"EUR/RUB"_q || ticker == u"EURRUB"_q) {
+		return QString("€ %1₽").arg(state.eurRub, 0, 'f', 1);
+	} else if (ticker == u"EUR/USD"_q || ticker == u"EURUSD"_q) {
+		return QString("€ $%1").arg(state.eurUsd, 0, 'f', 2);
+	}
+	return QString("%1: $%2").arg(ticker).arg(state.tonUsd, 0, 'f', 2);
 }
 
 // ---------------------------------------------------------------------------
@@ -371,12 +406,10 @@ void PaintPillIcon(QPainter &p, PillType type, const QRect &r, const QColor &fg)
 
 	switch (type) {
 	case PillType::DcPing: {
-		// Central broadcast point
 		p.setPen(Qt::NoPen);
 		p.setBrush(fg);
 		p.drawEllipse(QPointF(cx, cy + 2), 1.6, 1.6);
 
-		// Wave arcs
 		p.setBrush(Qt::NoBrush);
 		p.setPen(QPen(fg, 1.3));
 		p.drawArc(QRectF(cx - 4, cy - 2, 8, 8), 45 * 16, 90 * 16);
@@ -384,7 +417,6 @@ void PaintPillIcon(QPainter &p, PillType type, const QRect &r, const QColor &fg)
 		break;
 	}
 	case PillType::NetSpeed: {
-		// Speed arrow with base line
 		p.setPen(QPen(fg, 1.4, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
 		p.drawLine(cx, cy - 4, cx, cy + 3);
 		p.drawLine(cx - 3, cy, cx, cy + 3);
@@ -393,11 +425,9 @@ void PaintPillIcon(QPainter &p, PillType type, const QRect &r, const QColor &fg)
 		break;
 	}
 	case PillType::Ram: {
-		// Microchip square
 		p.setPen(QPen(fg, 1.2));
 		p.setBrush(Qt::NoBrush);
 		p.drawRoundedRect(QRectF(cx - 4, cy - 4, 8, 8), 1.5, 1.5);
-		// Pins
 		p.drawLine(cx - 2, cy - 6, cx - 2, cy - 4);
 		p.drawLine(cx + 2, cy - 6, cx + 2, cy - 4);
 		p.drawLine(cx - 2, cy + 4, cx - 2, cy + 6);
@@ -409,7 +439,6 @@ void PaintPillIcon(QPainter &p, PillType type, const QRect &r, const QColor &fg)
 		break;
 	}
 	case PillType::Ghost: {
-		// Cute ghost silhouette
 		QPainterPath gp;
 		gp.moveTo(cx - 4, cy + 4);
 		gp.lineTo(cx - 4, cy);
@@ -422,7 +451,6 @@ void PaintPillIcon(QPainter &p, PillType type, const QRect &r, const QColor &fg)
 		p.setPen(QPen(fg, 1.1));
 		p.setBrush(QColor(fg.red(), fg.green(), fg.blue(), 60));
 		p.drawPath(gp);
-		// Ghost eyes
 		p.setPen(Qt::NoPen);
 		p.setBrush(fg);
 		p.drawEllipse(QPointF(cx - 1.5, cy - 1), 0.9, 0.9);
@@ -430,7 +458,6 @@ void PaintPillIcon(QPainter &p, PillType type, const QRect &r, const QColor &fg)
 		break;
 	}
 	case PillType::Proxy: {
-		// Shield
 		QPainterPath sp;
 		sp.moveTo(cx - 4.5, cy - 4.5);
 		sp.lineTo(cx + 4.5, cy - 4.5);
@@ -441,18 +468,15 @@ void PaintPillIcon(QPainter &p, PillType type, const QRect &r, const QColor &fg)
 		p.setPen(QPen(fg, 1.2));
 		p.setBrush(QColor(fg.red(), fg.green(), fg.blue(), 50));
 		p.drawPath(sp);
-		// Checkmark inside shield
 		p.setPen(QPen(fg, 1.2, Qt::SolidLine, Qt::RoundCap));
 		p.drawLine(cx - 2, cy, cx - 0.5, cy + 1.8);
 		p.drawLine(cx - 0.5, cy + 1.8, cx + 2.2, cy - 1.5);
 		break;
 	}
 	case PillType::Weather: {
-		// Sun center
 		p.setPen(QPen(QColor(255, 185, 45), 1.2));
 		p.setBrush(QColor(255, 185, 45, 140));
 		p.drawEllipse(QPointF(cx, cy), 3.2, 3.2);
-		// Sun rays
 		for (int i = 0; i < 8; ++i) {
 			const double angle = i * (kPi / 4.0);
 			const double r1 = 4.2;
@@ -464,7 +488,6 @@ void PaintPillIcon(QPainter &p, PillType type, const QRect &r, const QColor &fg)
 		break;
 	}
 	case PillType::Rates: {
-		// Coin gem badge
 		p.setPen(QPen(QColor(247, 147, 26), 1.2));
 		p.setBrush(QColor(247, 147, 26, 60));
 		p.drawEllipse(QPointF(cx, cy), 4.8, 4.8);
@@ -511,6 +534,50 @@ void SetPillEnabled(PillType type, bool enabled) {
 	case PillType::Weather: SetConfigBool(kWeatherKey, enabled); break;
 	case PillType::Rates: SetConfigBool(kRatesKey, enabled); break;
 	}
+}
+
+// ---------------------------------------------------------------------------
+// Weather & Rates Config Helpers
+// ---------------------------------------------------------------------------
+
+WeatherUnit CurrentWeatherUnit() {
+	return (ConfigInt(kWeatherUnitKey, 0) == 1)
+		? WeatherUnit::Fahrenheit
+		: WeatherUnit::Celsius;
+}
+
+void SetWeatherUnit(WeatherUnit unit) {
+	auto &wstate = GetWeatherState();
+	wstate.isFahrenheit = (unit == WeatherUnit::Fahrenheit);
+	SetConfigInt(kWeatherUnitKey, wstate.isFahrenheit ? 1 : 0);
+	RefreshWeather(true);
+}
+
+void ToggleWeatherUnit() {
+	auto &wstate = GetWeatherState();
+	wstate.isFahrenheit = !wstate.isFahrenheit;
+	SetConfigInt(kWeatherUnitKey, wstate.isFahrenheit ? 1 : 0);
+	RefreshWeather(true);
+}
+
+QString CurrentWeatherCity() {
+	return ConfigString(kWeatherCityKey, u"Berlin"_q);
+}
+
+void SetWeatherLocation(const QString &city, const QString &lat, const QString &lon) {
+	SetConfigString(kWeatherCityKey, city.trimmed());
+	SetConfigString(kWeatherLatKey, lat.trimmed());
+	SetConfigString(kWeatherLonKey, lon.trimmed());
+	RefreshWeather(true);
+}
+
+QString CurrentRatesTickers() {
+	return ConfigString(kRateTickersKey, u"BTC,TON,ETH,SOL,USD/RUB,EUR/RUB"_q);
+}
+
+void SetRatesTickers(const QString &tickers) {
+	SetConfigString(kRateTickersKey, tickers.trimmed());
+	RefreshRates(true);
 }
 
 // ---------------------------------------------------------------------------
@@ -588,24 +655,14 @@ QString CurrentWeatherText() {
 
 QString CurrentRatesText() {
 	const auto &state = GetRatesState();
-	switch (state.activePair) {
-	case 0:
+	const auto tickers = CurrentRatesTickers().split(',', Qt::SkipEmptyParts);
+	if (tickers.isEmpty()) {
 		return (state.btcUsd >= 1000.0)
 			? QString("₿ $%1k").arg(state.btcUsd / 1000.0, 0, 'f', 1)
 			: QString("₿ $%1").arg(qRound(state.btcUsd));
-	case 1:
-		return QString("💎 $%1").arg(state.tonUsd, 0, 'f', 2);
-	case 2:
-		return QString("$ %1₽").arg(state.usdRub, 0, 'f', 1);
-	case 3:
-		return QString("€ %1₽").arg(state.eurRub, 0, 'f', 1);
-	case 4:
-		return QString("€ $%1").arg(state.eurUsd, 0, 'f', 2);
-	case 5:
-		return QString("Ξ $%1").arg(qRound(state.ethUsd));
-	default:
-		return QString("₿ $%1k").arg(state.btcUsd / 1000.0, 0, 'f', 1);
 	}
+	const auto idx = std::abs(state.activePairIndex) % tickers.size();
+	return FormatTickerValue(tickers[idx], state);
 }
 
 void TriggerDcPingProbe(Window::SessionController *controller) {
@@ -711,8 +768,8 @@ void RefreshRates(bool force) {
 	}
 	state.inFlight = true;
 
-	// 1. CoinGecko API for BTC, TON, ETH
-	const auto cgUrl = QUrl(u"https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,the-open-network,ethereum&vs_currencies=usd,eur,rub"_q);
+	// 1. CoinGecko API for BTC, TON, ETH, SOL, DOGE, NOT
+	const auto cgUrl = QUrl(u"https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,the-open-network,ethereum,solana,dogecoin,notcoin&vs_currencies=usd,eur,rub"_q);
 	auto cgReq = QNetworkRequest(cgUrl);
 	cgReq.setHeader(QNetworkRequest::UserAgentHeader, u"MoltenGram/2.0"_q);
 
@@ -737,6 +794,21 @@ void RefreshRates(bool force) {
 			const auto eth = obj.value(u"ethereum"_q).toObject();
 			if (!eth.isEmpty()) {
 				state.ethUsd = eth.value(u"usd"_q).toDouble(state.ethUsd);
+			}
+
+			const auto sol = obj.value(u"solana"_q).toObject();
+			if (!sol.isEmpty()) {
+				state.solUsd = sol.value(u"usd"_q).toDouble(state.solUsd);
+			}
+
+			const auto doge = obj.value(u"dogecoin"_q).toObject();
+			if (!doge.isEmpty()) {
+				state.dogeUsd = doge.value(u"usd"_q).toDouble(state.dogeUsd);
+			}
+
+			const auto notc = obj.value(u"notcoin"_q).toObject();
+			if (!notc.isEmpty()) {
+				state.notUsd = notc.value(u"usd"_q).toDouble(state.notUsd);
 			}
 
 			state.lastFetch = QDateTime::currentMSecsSinceEpoch();
@@ -771,8 +843,10 @@ void RefreshRates(bool force) {
 
 void CycleRatesPair() {
 	auto &state = GetRatesState();
-	state.activePair = (state.activePair + 1) % 6;
-	SetConfigInt(kRatePairKey, state.activePair);
+	const auto tickers = CurrentRatesTickers().split(',', Qt::SkipEmptyParts);
+	const int count = std::max(1, int(tickers.size()));
+	state.activePairIndex = (state.activePairIndex + 1) % count;
+	SetConfigInt(kRatePairKey, state.activePairIndex);
 }
 
 void CycleNetSpeedMode() {
@@ -803,7 +877,7 @@ void PaintPills(
 	p.setRenderHint(QPainter::Antialiasing, true);
 	p.setRenderHint(QPainter::TextAntialiasing, true);
 
-	const bool isDark = (st::windowBg->c.lightness() < 128);
+	const bool isDark = (st::dialogsBg->c.lightness() < 128);
 
 	for (int i = 0; i < int(pills.size()); ++i) {
 		const auto &pill = pills[i];
@@ -825,11 +899,9 @@ void PaintPills(
 		QColor border;
 
 		if (pill.type == PillType::Ghost && Extera::GhostActive()) {
-			// MD3 purple container
 			fill = QColor(160, 110, 240, hovered ? 75 : (pressed ? 95 : 55));
 			border = QColor(160, 110, 240, 150);
 		} else if (pill.type == PillType::Proxy && Core::App().settings().proxy().isEnabled()) {
-			// MD3 emerald container
 			fill = QColor(52, 180, 90, hovered ? 75 : (pressed ? 95 : 55));
 			border = QColor(52, 180, 90, 150);
 		} else if (pill.type == PillType::DcPing) {
@@ -845,7 +917,6 @@ void PaintPills(
 				border = QColor(244, 67, 54, 110);
 			}
 		} else {
-			// Neutral MD3 tonal elevation container
 			if (isDark) {
 				fill = QColor(255, 255, 255, hovered ? 32 : (pressed ? 46 : 20));
 				border = QColor(255, 255, 255, 34);
@@ -903,7 +974,8 @@ Widget::Widget(QWidget *parent, Window::SessionController *controller)
 	// Load initial state modes from config
 	GetNetSpeedState().mode = static_cast<NetSpeedDisplayMode>(ConfigInt(kNetSpeedModeKey, 0));
 	GetRamState().mode = static_cast<RamDisplayMode>(ConfigInt(kRamModeKey, 0));
-	GetRatesState().activePair = ConfigInt(kRatePairKey, 0);
+	GetRatesState().activePairIndex = ConfigInt(kRatePairKey, 0);
+	GetWeatherState().isFahrenheit = (ConfigInt(kWeatherUnitKey, 0) == 1);
 
 	updateData();
 	_refreshTimer.callEach(2000);
@@ -950,28 +1022,28 @@ void Widget::rebuildPills() {
 		PillType::DcPing,
 		u"dc_ping"_q,
 		QString("DC%1: %2ms").arg(GetDcPingState().dcId).arg(CurrentDcPingMs()),
-		u"Telegram Data Center RTT (Click to re-ping)"_q,
+		u"Telegram Data Center RTT (Click to re-ping socket)"_q,
 		QColor(76, 175, 80));
 
 	addPill(
 		PillType::NetSpeed,
 		u"net_speed"_q,
 		CurrentNetSpeedText(),
-		u"Network Throughput (Click to switch mode)"_q,
+		u"Network Throughput (Click to cycle display mode)"_q,
 		QColor(33, 150, 243));
 
 	addPill(
 		PillType::Ram,
 		u"ram"_q,
 		CurrentRamText(),
-		u"Memory Usage (Click to toggle System % / App RAM)"_q,
+		u"Memory Usage (Click to toggle System % / App Process RSS)"_q,
 		QColor(156, 39, 176));
 
 	addPill(
 		PillType::Ghost,
 		u"ghost"_q,
 		Extera::GhostActive() ? u"Ghost: ON"_q : u"Ghost: OFF"_q,
-		u"Ghost Mode (Click to toggle ON/OFF)"_q,
+		u"Ghost Mode (Click to toggle stealth ON/OFF)"_q,
 		QColor(160, 110, 240));
 
 	addPill(
@@ -981,27 +1053,32 @@ void Widget::rebuildPills() {
 		u"Proxy Connection (Click to toggle ON/OFF)"_q,
 		QColor(52, 180, 90));
 
+	const auto cityName = CurrentWeatherCity();
 	addPill(
 		PillType::Weather,
 		u"weather"_q,
 		CurrentWeatherText(),
-		u"Open-Meteo Weather (Click to refresh / toggle °C/°F)"_q,
+		QString("Weather in %1 (Click to toggle °C / °F)").arg(cityName),
 		QColor(255, 152, 0));
 
+	const auto tickers = CurrentRatesTickers().split(',', Qt::SkipEmptyParts);
+	const auto &rstate = GetRatesState();
+	const auto tickerIdx = (!tickers.isEmpty()) ? (std::abs(rstate.activePairIndex) % tickers.size()) : 0;
+	const auto activeTicker = (!tickers.isEmpty()) ? tickers[tickerIdx].trimmed() : u"BTC"_q;
 	addPill(
 		PillType::Rates,
 		u"rates"_q,
 		CurrentRatesText(),
-		u"Exchange Rates (Click to cycle pairs: BTC, TON, USD, EUR)"_q,
+		QString("Exchange Rates (%1 - Click to cycle tickers)").arg(activeTicker),
 		QColor(247, 147, 26));
 
-	// Compute geometries
+	// Compute geometries adhering to MD3 8dp spatial grid
 	const auto font = st::semiboldFont;
 	const auto pillH = style::ConvertScale(24);
-	const auto gap = style::ConvertScale(6);
+	const auto gap = style::ConvertScale(8);
 	const auto padX = style::ConvertScale(8);
-	const auto iconSize = style::ConvertScale(13);
-	const auto textGap = style::ConvertScale(5);
+	const auto iconSize = style::ConvertScale(14);
+	const auto textGap = style::ConvertScale(6);
 
 	int curX = padX;
 	const int curY = (height() > pillH) ? ((height() - pillH) / 2) : 0;
@@ -1012,6 +1089,10 @@ void Widget::rebuildPills() {
 		pill.rect = QRect(curX, curY, pillW, pillH);
 		curX += pillW + gap;
 	}
+
+	const int totalW = curX + padX;
+	_maxScrollX = std::max(0, totalW - width());
+	_scrollX = std::clamp(_scrollX, 0, _maxScrollX);
 }
 
 int Widget::naturalWidth() const {
@@ -1022,8 +1103,9 @@ int Widget::naturalWidth() const {
 }
 
 int Widget::pillAt(const QPoint &pos) const {
+	const auto translatedPos = pos + QPoint(_scrollX, 0);
 	for (int i = 0; i < int(_pills.size()); ++i) {
-		if (_pills[i].rect.contains(pos)) {
+		if (_pills[i].rect.contains(translatedPos)) {
 			return i;
 		}
 	}
@@ -1032,10 +1114,52 @@ int Widget::pillAt(const QPoint &pos) const {
 
 void Widget::paintEvent(QPaintEvent *e) {
 	Painter p(this);
-	PaintPills(p, rect(), _pills, _hoveredIndex, _pressedIndex);
+	p.setClipRect(rect());
+
+	p.save();
+	p.translate(-_scrollX, 0);
+	const auto visibleRect = rect().translated(_scrollX, 0);
+	PaintPills(p, visibleRect, _pills, _hoveredIndex, _pressedIndex);
+	p.restore();
+
+	// Smooth fade edge gradients matching dialogs sidebar background
+	if (_scrollX > 0) {
+		const auto edgeW = style::ConvertScale(16);
+		QLinearGradient lg(0, 0, edgeW, 0);
+		lg.setColorAt(0, st::dialogsBg->c);
+		lg.setColorAt(1, QColor(st::dialogsBg->c.red(), st::dialogsBg->c.green(), st::dialogsBg->c.blue(), 0));
+		p.fillRect(0, 0, edgeW, height(), lg);
+	}
+	if (_scrollX < _maxScrollX) {
+		const auto edgeW = style::ConvertScale(16);
+		QLinearGradient rg(width() - edgeW, 0, width(), 0);
+		rg.setColorAt(0, QColor(st::dialogsBg->c.red(), st::dialogsBg->c.green(), st::dialogsBg->c.blue(), 0));
+		rg.setColorAt(1, st::dialogsBg->c);
+		p.fillRect(width() - edgeW, 0, edgeW, height(), rg);
+	}
+}
+
+void Widget::wheelEvent(QWheelEvent *e) {
+	const auto delta = e->angleDelta();
+	const auto d = (delta.x() != 0) ? delta.x() : delta.y();
+	if (d != 0) {
+		_scrollX = std::clamp(_scrollX - (d > 0 ? 35 : -35), 0, _maxScrollX);
+		update();
+		e->accept();
+	}
 }
 
 void Widget::mouseMoveEvent(QMouseEvent *e) {
+	if (e->buttons() & Qt::LeftButton) {
+		const auto dx = e->pos().x() - _dragStartPos.x();
+		if (std::abs(dx) > 3) {
+			_dragging = true;
+			_scrollX = std::clamp(_dragStartScrollX - dx, 0, _maxScrollX);
+			_pressedIndex = -1;
+			update();
+			return;
+		}
+	}
 	const auto idx = pillAt(e->pos());
 	if (idx != _hoveredIndex) {
 		_hoveredIndex = idx;
@@ -1059,6 +1183,9 @@ void Widget::leaveEventHook(QEvent *e) {
 
 void Widget::mousePressEvent(QMouseEvent *e) {
 	if (e->button() == Qt::LeftButton) {
+		_dragStartPos = e->pos();
+		_dragStartScrollX = _scrollX;
+		_dragging = false;
 		_pressedIndex = pillAt(e->pos());
 		update();
 	}
@@ -1066,10 +1193,13 @@ void Widget::mousePressEvent(QMouseEvent *e) {
 
 void Widget::mouseReleaseEvent(QMouseEvent *e) {
 	if (e->button() == Qt::LeftButton) {
-		const auto idx = pillAt(e->pos());
-		if (idx >= 0 && idx == _pressedIndex) {
-			onPillClicked(idx);
+		if (!_dragging) {
+			const auto idx = pillAt(e->pos());
+			if (idx >= 0 && idx == _pressedIndex) {
+				onPillClicked(idx);
+			}
 		}
+		_dragging = false;
 		_pressedIndex = -1;
 		update();
 	}
@@ -1143,9 +1273,7 @@ void Widget::onPillClicked(int index) {
 		break;
 	}
 	case PillType::Weather: {
-		auto &wstate = GetWeatherState();
-		wstate.isFahrenheit = !wstate.isFahrenheit;
-		RefreshWeather(true);
+		ToggleWeatherUnit();
 		updateData();
 		break;
 	}
@@ -1162,15 +1290,18 @@ void Widget::onPillClicked(int index) {
 
 void ShowSettingsBox(not_null<Window::SessionController*> controller) {
 	controller->show(Box([=](not_null<Ui::GenericBox*> box) {
+		box->setWidth(st::boxWideWidth);
 		box->setTitle(rpl::single(u"PillStack Information Badges"_q));
+		box->addTopButton(st::boxTitleClose, [=] { box->closeBox(); });
 		const auto container = box->verticalLayout();
 
 		Ui::AddSubsectionTitle(container, rpl::single(u"General"_q));
+		Ui::AddSkip(container, 8);
 
 		const auto masterToggle = container->add(
 			object_ptr<Ui::SettingsButton>(
 				container,
-				rpl::single(u"Enable PillStack Bar"_q),
+				rpl::single(u"Enable PillStack Bar in Sidebar Header"_q),
 				st::settingsButtonNoIcon));
 		masterToggle->toggleOn(rpl::single(Enabled()));
 		masterToggle->toggledChanges() | rpl::on_next([](bool enabled) {
@@ -1180,91 +1311,131 @@ void ShowSettingsBox(not_null<Window::SessionController*> controller) {
 			}
 		}, masterToggle->lifetime());
 
-		Ui::AddSubsectionTitle(container, rpl::single(u"Telemetry & Performance"_q));
+		Ui::AddSkip(container, 16);
+		Ui::AddSubsectionTitle(container, rpl::single(u"Telemetry & Hardware Monitors"_q));
+		Ui::AddSkip(container, 8);
 
 		const auto pingToggle = container->add(
 			object_ptr<Ui::SettingsButton>(
 				container,
-				rpl::single(u"DC Ping & RTT Latency"_q),
+				rpl::single(u"DC Ping & RTT Latency Badge"_q),
 				st::settingsButtonNoIcon));
 		pingToggle->toggleOn(rpl::single(PillEnabled(PillType::DcPing)));
 		pingToggle->toggledChanges() | rpl::on_next([](bool val) {
 			SetPillEnabled(PillType::DcPing, val);
 		}, pingToggle->lifetime());
 
+		Ui::AddSkip(container, 4);
+		const auto pingBtn = container->add(
+			object_ptr<Ui::SettingsButton>(
+				container,
+				rpl::single(QString("Probe Active Data Center Now (DC%1: %2ms)").arg(GetDcPingState().dcId).arg(CurrentDcPingMs())),
+				st::settingsButtonNoIcon));
+		pingBtn->setClickedCallback([=] {
+			TriggerDcPingProbe(controller);
+		});
+
+		Ui::AddSkip(container, 8);
 		const auto speedToggle = container->add(
 			object_ptr<Ui::SettingsButton>(
 				container,
-				rpl::single(u"Network Throughput Monitor"_q),
+				rpl::single(u"Network Throughput Monitor Badge"_q),
 				st::settingsButtonNoIcon));
 		speedToggle->toggleOn(rpl::single(PillEnabled(PillType::NetSpeed)));
 		speedToggle->toggledChanges() | rpl::on_next([](bool val) {
 			SetPillEnabled(PillType::NetSpeed, val);
 		}, speedToggle->lifetime());
 
+		Ui::AddSkip(container, 4);
+		const auto speedModeBtn = container->add(
+			object_ptr<Ui::SettingsButton>(
+				container,
+				rpl::single(u"Cycle Network Speed Mode (Dominant / Download / Upload / Combined)"_q),
+				st::settingsButtonNoIcon));
+		speedModeBtn->setClickedCallback([=] {
+			CycleNetSpeedMode();
+		});
+
+		Ui::AddSkip(container, 8);
 		const auto ramToggle = container->add(
 			object_ptr<Ui::SettingsButton>(
 				container,
-				rpl::single(u"RAM / Memory Usage"_q),
+				rpl::single(u"RAM / Memory Usage Badge"_q),
 				st::settingsButtonNoIcon));
 		ramToggle->toggleOn(rpl::single(PillEnabled(PillType::Ram)));
 		ramToggle->toggledChanges() | rpl::on_next([](bool val) {
 			SetPillEnabled(PillType::Ram, val);
 		}, ramToggle->lifetime());
 
-		Ui::AddSubsectionTitle(container, rpl::single(u"Privacy & Network"_q));
+		Ui::AddSkip(container, 4);
+		const auto ramModeBtn = container->add(
+			object_ptr<Ui::SettingsButton>(
+				container,
+				rpl::single(u"Toggle RAM Mode (System Memory % / Telegram Process RSS)"_q),
+				st::settingsButtonNoIcon));
+		ramModeBtn->setClickedCallback([=] {
+			CycleRamMode();
+		});
+
+		Ui::AddSkip(container, 16);
+		Ui::AddSubsectionTitle(container, rpl::single(u"Privacy & Network Badges"_q));
+		Ui::AddSkip(container, 8);
 
 		const auto ghostToggle = container->add(
 			object_ptr<Ui::SettingsButton>(
 				container,
-				rpl::single(u"Ghost Mode Status Pill"_q),
+				rpl::single(u"Ghost Mode Status Badge"_q),
 				st::settingsButtonNoIcon));
 		ghostToggle->toggleOn(rpl::single(PillEnabled(PillType::Ghost)));
 		ghostToggle->toggledChanges() | rpl::on_next([](bool val) {
 			SetPillEnabled(PillType::Ghost, val);
 		}, ghostToggle->lifetime());
 
+		Ui::AddSkip(container, 4);
 		const auto proxyToggle = container->add(
 			object_ptr<Ui::SettingsButton>(
 				container,
-				rpl::single(u"Proxy Status Pill"_q),
+				rpl::single(u"Proxy Status Badge"_q),
 				st::settingsButtonNoIcon));
 		proxyToggle->toggleOn(rpl::single(PillEnabled(PillType::Proxy)));
 		proxyToggle->toggledChanges() | rpl::on_next([](bool val) {
 			SetPillEnabled(PillType::Proxy, val);
 		}, proxyToggle->lifetime());
 
-		Ui::AddSubsectionTitle(container, rpl::single(u"Live Services"_q));
+		Ui::AddSkip(container, 16);
+		Ui::AddSubsectionTitle(container, rpl::single(u"Live Weather (Open-Meteo)"_q));
+		Ui::AddSkip(container, 8);
 
 		const auto weatherToggle = container->add(
 			object_ptr<Ui::SettingsButton>(
 				container,
-				rpl::single(u"Weather (Open-Meteo)"_q),
+				rpl::single(u"Open-Meteo Weather Badge"_q),
 				st::settingsButtonNoIcon));
 		weatherToggle->toggleOn(rpl::single(PillEnabled(PillType::Weather)));
 		weatherToggle->toggledChanges() | rpl::on_next([](bool val) {
 			SetPillEnabled(PillType::Weather, val);
 		}, weatherToggle->lifetime());
 
-		const auto ratesToggle = container->add(
+		Ui::AddSkip(container, 4);
+		const auto unitToggle = container->add(
 			object_ptr<Ui::SettingsButton>(
 				container,
-				rpl::single(u"Exchange Rates (CoinGecko / CBR)"_q),
+				rpl::single(u"Use Fahrenheit (°F) instead of Celsius (°C)"_q),
 				st::settingsButtonNoIcon));
-		ratesToggle->toggleOn(rpl::single(PillEnabled(PillType::Rates)));
-		ratesToggle->toggledChanges() | rpl::on_next([](bool val) {
-			SetPillEnabled(PillType::Rates, val);
-		}, ratesToggle->lifetime());
+		unitToggle->toggleOn(rpl::single(GetWeatherState().isFahrenheit));
+		unitToggle->toggledChanges() | rpl::on_next([](bool val) {
+			SetWeatherUnit(val ? WeatherUnit::Fahrenheit : WeatherUnit::Celsius);
+		}, unitToggle->lifetime());
 
-		Ui::AddSubsectionTitle(container, rpl::single(u"Weather Location"_q));
-
+		Ui::AddSkip(container, 8);
 		const auto cityField = container->add(
 			object_ptr<Ui::InputField>(
 				container,
 				st::defaultInputField,
 				rpl::single(u"City Name"_q),
-				ConfigString(kWeatherCityKey, u"Berlin"_q)));
+				CurrentWeatherCity()));
 
+		Ui::AddSkip(container, 8);
 		const auto latField = container->add(
 			object_ptr<Ui::InputField>(
 				container,
@@ -1272,6 +1443,7 @@ void ShowSettingsBox(not_null<Window::SessionController*> controller) {
 				rpl::single(u"Latitude (e.g. 52.5200)"_q),
 				ConfigString(kWeatherLatKey, u"52.5200"_q)));
 
+		Ui::AddSkip(container, 8);
 		const auto lonField = container->add(
 			object_ptr<Ui::InputField>(
 				container,
@@ -1279,16 +1451,49 @@ void ShowSettingsBox(not_null<Window::SessionController*> controller) {
 				rpl::single(u"Longitude (e.g. 13.4050)"_q),
 				ConfigString(kWeatherLonKey, u"13.4050"_q)));
 
-		const auto saveBtn = container->add(
+		Ui::AddSkip(container, 8);
+		const auto saveWeatherBtn = container->add(
 			object_ptr<Ui::SettingsButton>(
 				container,
-				rpl::single(u"Save Weather Location & Refresh"_q),
+				rpl::single(u"Save Weather Location & Fetch"_q),
 				st::settingsButtonNoIcon));
-		saveBtn->setClickedCallback([=] {
-			SetConfigString(kWeatherCityKey, cityField->getLastText().trimmed());
-			SetConfigString(kWeatherLatKey, latField->getLastText().trimmed());
-			SetConfigString(kWeatherLonKey, lonField->getLastText().trimmed());
-			RefreshWeather(true);
+		saveWeatherBtn->setClickedCallback([=] {
+			SetWeatherLocation(
+				cityField->getLastText(),
+				latField->getLastText(),
+				lonField->getLastText());
+		});
+
+		Ui::AddSkip(container, 16);
+		Ui::AddSubsectionTitle(container, rpl::single(u"Crypto & Currency Exchange Rates"_q));
+		Ui::AddSkip(container, 8);
+
+		const auto ratesToggle = container->add(
+			object_ptr<Ui::SettingsButton>(
+				container,
+				rpl::single(u"Exchange Rates Badge"_q),
+				st::settingsButtonNoIcon));
+		ratesToggle->toggleOn(rpl::single(PillEnabled(PillType::Rates)));
+		ratesToggle->toggledChanges() | rpl::on_next([](bool val) {
+			SetPillEnabled(PillType::Rates, val);
+		}, ratesToggle->lifetime());
+
+		Ui::AddSkip(container, 8);
+		const auto tickersField = container->add(
+			object_ptr<Ui::InputField>(
+				container,
+				st::defaultInputField,
+				rpl::single(u"Customizable Tickers (comma-separated, e.g. BTC, TON, ETH, SOL, USD/RUB, EUR/RUB)"_q),
+				CurrentRatesTickers()));
+
+		Ui::AddSkip(container, 8);
+		const auto saveTickersBtn = container->add(
+			object_ptr<Ui::SettingsButton>(
+				container,
+				rpl::single(u"Save Tickers & Refresh Rates"_q),
+				st::settingsButtonNoIcon));
+		saveTickersBtn->setClickedCallback([=] {
+			SetRatesTickers(tickersField->getLastText());
 		});
 
 		box->addButton(tr::lng_close(), [=] { box->closeBox(); });

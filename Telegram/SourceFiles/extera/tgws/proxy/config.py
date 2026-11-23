@@ -14,48 +14,17 @@ from .utils import build_github_opener
 
 log = logging.getLogger('tg-mtproto-proxy')
 
-CFPROXY_DOMAINS_URL = (
-    "https://raw.githubusercontent.com/Flowseal/tg-ws-proxy/main"
-    "/.github/cfproxy-domains.txt"
-)
+CFPROXY_DOMAINS_URL = ""
 
-_CFPROXY_ENC: List[str] = [
-    'virkgj.com', 
-    'vmmzovy.com', 
-    'mkuosckvso.com', 
-    'zaewayzmplad.com', 
-    'twdmbzcm.com',
-    'awzwsldi.com',
-    'clngqrflngqin.com',
-    'tjacxbqtj.com',
-    'bxaxtxmrw.com',
-    'dmohrsgmohcrwb.com',
-    'vwbmtmoi.com',
-    'khgrre.com',
-    'ulihssf.com',
-    'tmhqsdqmfpmk.com',
-    'xwuwoqbm.com',
-    'orgcnunpj.com',
-    'zhkuldz.com',
-    'zypoljnslxa.com',
-    'efabnxaowuzs.com',
-    'zaftuzsftqdq.com'
-]
+_CFPROXY_ENC: List[str] = []
 _S = ''.join(chr(c) for c in (46, 99, 111, 46, 117, 107))
 
 
 def _dd(s: str) -> str:
-    """Only for decoding CF proxy domains"""
-    if not s[-4:] == '.com':
-        return s
-    p, n = s[:-4], sum(c.isalpha() for c in s[:-4])
-    return ''.join(
-        chr((ord(c) - (97 if c > '`' else 65) - n) % 26 + (97 if c > '`' else 65))
-        if c.isalpha() else c for c in p
-    ) + _S
+    return s
 
 
-CFPROXY_DEFAULT_DOMAINS: List[str] = [_dd(d) for d in _CFPROXY_ENC]
+CFPROXY_DEFAULT_DOMAINS: List[str] = []
 _CFPROXY_MIN_VALID_DOMAINS = 3
 
 
@@ -67,10 +36,10 @@ class ProxyConfig:
     dc_redirects: Dict[int, str] = field(default_factory=lambda: {2: '149.154.167.220', 4: '149.154.167.220'})
     buffer_size: int = 256 * 1024
     pool_size: int = 4
-    fallback_cfproxy: bool = True
+    fallback_cfproxy: bool = False
     cfproxy_user_domains: List[str] = field(default_factory=list)
     cfproxy_worker_domains: List[str] = field(default_factory=list)
-    cfproxy_h2_media: bool = True
+    cfproxy_h2_media: bool = False
     disable_secure: bool = False
     fake_tls_domain: str = ''
     proxy_protocol: bool = False
@@ -110,19 +79,7 @@ def coerce_domain_list(value) -> List[str]:
 
 
 def _fetch_cfproxy_domain_list() -> List[str]:
-    try:
-        req = Request(CFPROXY_DOMAINS_URL + "?" + "".join(random.choices(string.ascii_letters, k=7)),
-                       headers={'User-Agent': 'tg-ws-proxy'})
-        with build_github_opener().open(req, timeout=10) as resp:
-            text = resp.read().decode('utf-8', errors='replace')
-        encoded = [
-            line.strip() for line in text.splitlines()
-            if line.strip() and not line.startswith('#')
-        ]
-        return [_dd(d) for d in encoded]
-    except Exception as exc:
-        log.warning("Failed to fetch CF proxy domain list: %s", repr(exc))
-        return []
+    return []
 
 
 def _is_valid_domain(domain: str) -> bool:
@@ -162,46 +119,14 @@ def _normalize_domain_pool(domains: List[str]) -> List[str]:
 
 
 def refresh_cfproxy_domains() -> None:
-    if proxy_config.cfproxy_user_domains:
-        return
-
-    fetched = _fetch_cfproxy_domain_list()
-    pool = _normalize_domain_pool(fetched)
-    if len(pool) >= _CFPROXY_MIN_VALID_DOMAINS:
-        balancer.update_domains_list(pool)
-        log.info("CF proxy domain pool updated from GitHub (%d domains)", len(pool))
-        return
-
-    if fetched:
-        log.warning(
-            "Ignoring fetched CF proxy domains due to low-quality payload "
-            "(total=%d, valid=%d, required>=%d); keeping current domain pool",
-            len(fetched), len(pool), _CFPROXY_MIN_VALID_DOMAINS,
-        )
-    else:
-        log.warning(
-            "CF proxy domain refresh failed or empty response; "
-            "keeping current domain pool",
-        )
+    return
 
 
 _refresh_stop: threading.Event = threading.Event()
 
 
 def start_cfproxy_domain_refresh() -> None:
-    global _refresh_stop
-    _refresh_stop.set()
-    _refresh_stop = threading.Event()
-    stop = _refresh_stop
-
-    balancer.update_domains_list(CFPROXY_DEFAULT_DOMAINS)
-
-    def _loop():
-        refresh_cfproxy_domains()
-        while not stop.wait(timeout=3600):
-            refresh_cfproxy_domains()
-
-    threading.Thread(target=_loop, daemon=True, name='cfproxy-domains-refresh').start()
+    return
 
 
 def parse_dc_ip_list(dc_ip_list: List[str]) -> Dict[int, str]:

@@ -2575,7 +2575,7 @@ void SendGuardReport(
 	};
 	session->api().request(MTPcontacts_ResolveUsername(
 		MTP_flags(0),
-		MTP_string(u"exDesktopPlugins"_q),
+		MTP_string(u"MoltenGramPlugins"_q),
 		MTP_string()
 	)).done([=](const MTPcontacts_ResolvedPeer &result) {
 		const auto &data = result.data();

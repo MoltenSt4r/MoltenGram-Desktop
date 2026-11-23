@@ -9,6 +9,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "extera/extera_utils.h"
 #include "extera/extera_config.h"
 #include "extera/extera_streamer.h"
+#include "extera/molten_avatar_shapes.h"
 
 #include "api/api_sensitive_content.h"
 #include "data/data_user.h"
@@ -475,12 +476,14 @@ void PeerData::paintUserpic(
 	if (context.shape == Ui::PeerUserpicShape::Auto) {
 		context.shape = userpicShape();
 	}
+	const auto md3Shape = Extera::AvatarShapes::ShapeForPeer(this);
 	Ui::ValidateUserpicCache(
 		view,
 		cloud,
 		cloud ? nullptr : ensureEmptyUserpic().get(),
 		size * ratio,
-		context.shape);
+		context.shape,
+		md3Shape);
 	p.drawImage(QRect(context.position, QSize(size, size)), view.cached);
 }
 
@@ -523,6 +526,7 @@ QImage PeerData::GenerateUserpicImage(
 		Ui::PeerUserpicView &view,
 		int size,
 		std::optional<int> radius) {
+	const auto md3Shape = Extera::AvatarShapes::ShapeForPeer(peer);
 	if (const auto userpic = peer->userpicCloudImage(view)) {
 		auto image = userpic->scaled(
 			{ size, size },
@@ -537,6 +541,8 @@ QImage PeerData::GenerateUserpicImage(
 			return image;
 		} else if (radius) {
 			return round(*radius);
+		} else if (md3Shape > 0 && !peer->isForum()) {
+			return Ui::ApplyMd3ShapeMask(std::move(image), md3Shape);
 		} else if (peer->isForum()) {
 			return round(size * Ui::ForumUserpicRadiusMultiplier());
 		} else if (Ui::UserpicCorners() < 28) {
@@ -557,6 +563,12 @@ QImage PeerData::GenerateUserpicImage(
 	} else if (radius) {
 		const auto r = *radius;
 		peer->ensureEmptyUserpic()->paintRounded(p, 0, 0, size, size, r);
+	} else if (md3Shape > 0 && !peer->isForum()) {
+		auto hq = PainterHighQualityEnabler(p);
+		p.setClipPath(Extera::AvatarShapes::ShapePath(
+			md3Shape,
+			QRectF(0., 0., size, size)));
+		peer->ensureEmptyUserpic()->paintSquare(p, 0, 0, size, size);
 	} else if (peer->isForum()) {
 		peer->ensureEmptyUserpic()->paintRounded(
 			p,

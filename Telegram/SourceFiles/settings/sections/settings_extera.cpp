@@ -1847,45 +1847,10 @@ void PartGeneral6(SectionBuilder &builder) {
 	AddAbout(builder, tr::lng_extera_show_id_about());
 }
 
-void PartGeneral7(SectionBuilder &builder) {
+void PartGeneralProfile(SectionBuilder &builder) {
 	[[maybe_unused]] const auto controller = builder.controller();
-	[[maybe_unused]] const auto settings = &Core::App().settings();
-
 	builder.addSkip();
-	builder.addSubsectionTitle(tr::lng_extera_archive());
-	builder.card([&] {
-		const auto session = builder.session();
-		const auto hideArchive = builder.addButton({
-			.id = u"extera/hide_archive"_q,
-			.title = tr::lng_extera_hide_archive(),
-			.st = &st::settingsButtonNoIcon,
-			.toggled = rpl::single(session->settings().archiveInMainMenu()),
-			.keywords = { u"archive"_q },
-		});
-		if (hideArchive) {
-			hideArchive->toggledValue(
-			) | rpl::filter([=](bool value) {
-				return (value != session->settings().archiveInMainMenu());
-			}) | rpl::on_next([=](bool value) {
-				session->settings().setArchiveInMainMenu(value);
-				session->saveSettingsDelayed();
-			}, hideArchive->lifetime());
-		}
-	});
-	AddAbout(builder, tr::lng_extera_hide_archive_about());
-
-	builder.addSkip();
-	builder.card([&] {
-		AddToggle(
-			builder,
-			u"capture_protection"_q,
-			tr::lng_exd_capture_protection(),
-			{ u"screenshot"_q, u"capture"_q });
-	});
-	AddAbout(builder, tr::lng_exd_capture_protection_about());
-
-	builder.addSkip();
-	builder.addSubsectionTitle(rpl::single(u"MoltenGram"_q));
+	builder.addSubsectionTitle(rpl::single(u"MoltenGram Profile & Companion"_q));
 	builder.card([&] {
 		builder.addButton({
 			.id = u"extera/molten_profile_styling"_q,
@@ -1926,37 +1891,319 @@ void PartGeneral7(SectionBuilder &builder) {
 			u"molten_clean_bio_display"_q,
 			rpl::single(u"Hide Invisible Profile Tags"_q),
 			{ u"molten"_q, u"bio"_q, u"tags"_q });
+	});
+}
+
+void PartGeneralDevice(SectionBuilder &builder) {
+	[[maybe_unused]] const auto controller = builder.controller();
+	builder.addSkip();
+	builder.addSubsectionTitle(rpl::single(u"Device & Session"_q));
+	builder.card([&] {
 		builder.addButton({
-			.id = u"extera/molten_playlists"_q,
-			.title = rpl::single(u"My Local Playlists"_q),
+			.id = u"extera/molten_device_spoof"_q,
+			.title = rpl::single(u"Device & Session Spoofing"_q),
 			.st = &st::settingsButtonNoIcon,
 			.onClick = [=] {
-				Extera::Playlists::ShowPlaylistsBox(controller);
+				Extera::DeviceSpoof::ShowSettingsBox(controller);
 			},
-			.keywords = { u"molten"_q, u"playlist"_q, u"music"_q, u"audio"_q },
+			.keywords = { u"device"_q, u"spoof"_q, u"session"_q, u"model"_q, u"android"_q, u"ios"_q },
 		});
-		builder.addButton({
-			.id = u"extera/molten_custom_commands"_q,
-			.title = rpl::single(u"Custom Autocomplete Commands"_q),
+	});
+}
+
+void PartGeneralArchive(SectionBuilder &builder) {
+	builder.addSkip();
+	builder.addSubsectionTitle(tr::lng_extera_archive());
+	builder.card([&] {
+		const auto session = builder.session();
+		const auto hideArchive = builder.addButton({
+			.id = u"extera/hide_archive"_q,
+			.title = tr::lng_extera_hide_archive(),
 			.st = &st::settingsButtonNoIcon,
-			.onClick = [=] {
-				Extera::MoltenCommands::ShowSettingsBox(controller);
-			},
-			.keywords = { u"molten"_q, u"commands"_q, u"autocomplete"_q },
+			.toggled = rpl::single(session->settings().archiveInMainMenu()),
+			.keywords = { u"archive"_q },
 		});
+		if (hideArchive) {
+			hideArchive->toggledValue(
+			) | rpl::filter([=](bool value) {
+				return (value != session->settings().archiveInMainMenu());
+			}) | rpl::on_next([=](bool value) {
+				session->settings().setArchiveInMainMenu(value);
+				session->saveSettingsDelayed();
+			}, hideArchive->lifetime());
+		}
+	});
+	AddAbout(builder, tr::lng_extera_hide_archive_about());
+}
+
+void PartPrivacySecurity(SectionBuilder &builder) {
+	builder.addSkip();
+	builder.addSubsectionTitle(tr::lng_exd_cat_privacy());
+	builder.card([&] {
 		AddToggle(
 			builder,
-			u"custom_commands_enabled"_q,
-			rpl::single(u"Enable Custom Commands"_q),
-			{ u"molten"_q, u"commands"_q });
+			u"capture_protection"_q,
+			tr::lng_exd_capture_protection(),
+			{ u"screenshot"_q, u"capture"_q });
 		AddToggle(
 			builder,
 			u"strip_tracking_on_open"_q,
 			rpl::single(u"Strip URL Tracking Parameters"_q),
 			{ u"molten"_q, u"url"_q, u"tracking"_q, u"utm"_q, u"privacy"_q });
+	});
+	AddAbout(builder, tr::lng_exd_capture_protection_about());
+}
+
+void PartChatsGestures(SectionBuilder &builder) {
+	[[maybe_unused]] const auto controller = builder.controller();
+	const auto isRu = Lang::LanguageIdOrDefault(Lang::Id()).startsWith(u"ru"_q);
+
+	builder.addSkip();
+	builder.addSubsectionTitle(isRu
+		? rpl::single(u"Жесты и двойное нажатие"_q)
+		: rpl::single(u"Double-Tap & Gesture Shortcuts"_q));
+	builder.card([&] {
+		AddToggle(
+			builder,
+			u"molten_doubletap_enabled"_q,
+			isRu
+				? rpl::single(u"Двойное нажатие на сообщения"_q)
+				: rpl::single(u"Enable Double-Tap on Messages"_q),
+			{ u"doubletap"_q, u"gesture"_q, u"reply"_q, u"reaction"_q });
+
+		AddToggle(
+			builder,
+			u"molten_deleted_reply_quote"_q,
+			isRu
+				? rpl::single(u"Сохранять цитаты удалённых сообщений"_q)
+				: rpl::single(u"Preserve Deleted Reply Quotes"_q),
+			{ u"quotes"_q, u"deleted"_q, u"retained"_q });
+
+		AddToggle(
+			builder,
+			u"molten_reply_to_deleted_as_quote"_q,
+			isRu
+				? rpl::single(u"Цитировать удалённые сообщения в ответах"_q)
+				: rpl::single(u"Quote Deleted Messages in New Replies"_q),
+			{ u"quote"_q, u"reply"_q, u"deleted"_q });
+
+		builder.addButton({
+			.id = u"extera/molten_chat_extras"_q,
+			.title = isRu
+				? rpl::single(u"Настройка жестов и цитат"_q)
+				: rpl::single(u"Configure Gestures & Preserved Quotes"_q),
+			.st = &st::settingsButtonNoIcon,
+			.onClick = [=] {
+				Extera::ChatExtras::ShowSettingsBox(controller);
+			},
+			.keywords = { u"doubletap"_q, u"reply"_q, u"quotes"_q, u"reaction"_q, u"translate"_q, u"copy"_q, u"save"_q },
+		});
+	});
+	AddAbout(builder, isRu
+		? rpl::single(u"Настройте быстрый ответ, перевод, копирование, сохранение или реакцию по двойному нажатию, а также сохранение цитат удалённых сообщений."_q)
+		: rpl::single(u"Trigger quick reply, translation, copy, save, or reactions with double-tap, and retain text from deleted replies."_q));
+}
+
+void PartChatsUrlCleaner(SectionBuilder &builder) {
+	const auto isRu = Lang::LanguageIdOrDefault(Lang::Id()).startsWith(u"ru"_q);
+	builder.addSkip();
+	builder.addSubsectionTitle(isRu
+		? rpl::single(u"Очистка ссылок и приватность"_q)
+		: rpl::single(u"URL Cleaner & Link Protection"_q));
+	builder.card([&] {
+		AddToggle(
+			builder,
+			u"strip_tracking_on_open"_q,
+			isRu
+				? rpl::single(u"Очищать ссылки от трекеров (UTM, gclid, fbclid)"_q)
+				: rpl::single(u"Strip URL Tracking Parameters (UTM, Analytics)"_q),
+			{ u"molten"_q, u"url"_q, u"tracking"_q, u"utm"_q, u"privacy"_q });
+		AddToggle(
+			builder,
+			u"colored_text"_q,
+			isRu
+				? rpl::single(u"Цветной текст ссылок (tg://color)"_q)
+				: rpl::single(u"Colored Text Links (tg://color)"_q),
+			{ u"molten"_q, u"color"_q, u"text"_q });
+	});
+	AddAbout(builder, isRu
+		? rpl::single(u"Автоматически вырезает параметры отслеживания (utm_*, gclid, fbclid, yclid и др.) при открытии ссылок из сообщений."_q)
+		: rpl::single(u"Automatically removes tracking, marketing, and referral tokens from links when clicked in chats."_q));
+}
+
+void PartChatsCustomCommands(SectionBuilder &builder) {
+	[[maybe_unused]] const auto controller = builder.controller();
+	const auto isRu = Lang::LanguageIdOrDefault(Lang::Id()).startsWith(u"ru"_q);
+	builder.addSkip();
+	builder.addSubsectionTitle(isRu
+		? rpl::single(u"Пользовательские команды и шаблоны"_q)
+		: rpl::single(u"Custom Autocomplete Commands & Templates"_q));
+	builder.card([&] {
+		AddToggle(
+			builder,
+			u"custom_commands_enabled"_q,
+			isRu
+				? rpl::single(u"Включить команды автодополнения"_q)
+				: rpl::single(u"Enable Custom Autocomplete Commands"_q),
+			{ u"molten"_q, u"commands"_q, u"autocomplete"_q });
+		builder.addButton({
+			.id = u"extera/molten_custom_commands"_q,
+			.title = isRu
+				? rpl::single(u"Управление командами и шаблонами"_q)
+				: rpl::single(u"Manage Custom Commands & Templates"_q),
+			.st = &st::settingsButtonNoIcon,
+			.onClick = [=] {
+				Extera::MoltenCommands::ShowSettingsBox(controller);
+			},
+			.keywords = { u"molten"_q, u"commands"_q, u"autocomplete"_q, u"template"_q },
+		});
+	});
+	AddAbout(builder, isRu
+		? rpl::single(u"Быстрый ввод команд и текстовых шаблонов с префиксами (. / ! $) в поле ввода сообщения."_q)
+		: rpl::single(u"Type dot or slash commands (.id, .tagall, .ping, .shrug) for instant autocomplete suggestions in chat input."_q));
+}
+
+void PartChatsMediaAudio(SectionBuilder &builder) {
+	[[maybe_unused]] const auto controller = builder.controller();
+	const auto isRu = Lang::LanguageIdOrDefault(Lang::Id()).startsWith(u"ru"_q);
+	builder.addSkip();
+	builder.addSubsectionTitle(isRu
+		? rpl::single(u"Улучшения аудиоплеера"_q)
+		: rpl::single(u"Music Player Enhancements"_q));
+	builder.card([&] {
+		AddToggle(
+			builder,
+			u"player_wavy_seekbar"_q,
+			isRu
+				? rpl::single(u"Волнообразная полоса перемотки (Wavy-seekbar)"_q)
+				: rpl::single(u"Fluid Wavy-Seekbar"_q),
+			{ u"molten"_q, u"player"_q, u"wavy"_q, u"seekbar"_q, u"wave"_q });
+		AddToggle(
+			builder,
+			u"player_lrclib_lyrics"_q,
+			isRu
+				? rpl::single(u"Караоке-текст песни (LrcLib)"_q)
+				: rpl::single(u"LrcLib Karaoke Synced Lyrics"_q),
+			{ u"molten"_q, u"lyrics"_q, u"karaoke"_q, u"lrclib"_q });
+		AddToggle(
+			builder,
+			u"player_online_cover"_q,
+			isRu
+				? rpl::single(u"Загрузка обложек альбомов высокого качества"_q)
+				: rpl::single(u"High-Resolution Online Album Covers"_q),
+			{ u"molten"_q, u"cover"_q, u"artwork"_q, u"album"_q });
+		builder.addButton({
+			.id = u"extera/molten_playlists"_q,
+			.title = isRu
+				? rpl::single(u"Мои локальные плейлисты"_q)
+				: rpl::single(u"My Local Playlists"_q),
+			.st = &st::settingsButtonNoIcon,
+			.onClick = [=] {
+				Extera::Playlists::ShowPlaylistsBox(controller);
+			},
+			.keywords = { u"molten"_q, u"playlist"_q, u"music"_q, u"audio"_q, u"m3u8"_q },
+		});
+	});
+	AddAbout(builder, isRu
+		? rpl::single(u"Плавная анимированная звуковая волна при воспроизведении, синхронизированный караоке-текст LrcLib и управление плейлистами."_q)
+		: rpl::single(u"Fluid animated seekbar, synchronized LrcLib karaoke lyrics with auto-scrolling, and offline/online local playlist management."_q));
+}
+
+void PartChatsVoiceChanger(SectionBuilder &builder) {
+	[[maybe_unused]] const auto controller = builder.controller();
+	const auto isRu = Lang::LanguageIdOrDefault(Lang::Id()).startsWith(u"ru"_q);
+	builder.addSkip();
+	builder.addSubsectionTitle(isRu
+		? rpl::single(u"Изменение голоса и аудиоэффекты"_q)
+		: rpl::single(u"Voice Changer & Pitch Shifter"_q));
+	builder.card([&] {
+		AddToggle(
+			builder,
+			u"voice_changer_enabled"_q,
+			isRu
+				? rpl::single(u"Включить изменение голоса"_q)
+				: rpl::single(u"Enable Voice Changer for Voice Notes"_q),
+			{ u"voice"_q, u"changer"_q, u"pitch"_q, u"audio"_q });
+		AddToggle(
+			builder,
+			u"voice_changer_preview"_q,
+			isRu
+				? rpl::single(u"Предпросмотр эффектов перед отправкой"_q)
+				: rpl::single(u"Show Effects Preview Before Sending"_q),
+			{ u"voice"_q, u"preview"_q, u"dialog"_q });
+		builder.addButton({
+			.id = u"extera/molten_voice_changer"_q,
+			.title = isRu
+				? rpl::single(u"Пресеты изменения голоса и питч-шифтер"_q)
+				: rpl::single(u"Voice Effect Presets & Pitch Settings"_q),
+			.st = &st::settingsButtonNoIcon,
+			.onClick = [=] {
+				Extera::VoiceChanger::ShowSettingsBox(controller);
+			},
+			.keywords = { u"voice"_q, u"changer"_q, u"pitch"_q, u"robot"_q, u"echo"_q, u"chipmunk"_q, u"bass"_q },
+		});
+	});
+	AddAbout(builder, isRu
+		? rpl::single(u"8 встроенных эффектов (бас, гелий, робот, бурундук, соборное эхо, телефон) и ручная настройка высоты тона и темпа для голосовых сообщений."_q)
+		: rpl::single(u"8 voice presets (Deep Bass, Helium, Robot, Chipmunk, Slow, Reverb, Telephone, Custom) with real-time pitch and tempo shifting."_q));
+}
+
+void PartChatsSongRec(SectionBuilder &builder) {
+	[[maybe_unused]] const auto controller = builder.controller();
+	const auto isRu = Lang::LanguageIdOrDefault(Lang::Id()).startsWith(u"ru"_q);
+	builder.addSkip();
+	builder.addSubsectionTitle(isRu
+		? rpl::single(u"Распознавание музыки (SongRec / AudD)"_q)
+		: rpl::single(u"Music Recognition (SongRec / AudD)"_q));
+	builder.card([&] {
+		AddToggle(
+			builder,
+			u"songrec_enabled"_q,
+			isRu
+				? rpl::single(u"Включить распознавание музыки"_q)
+				: rpl::single(u"Enable Music Recognition"_q),
+			{ u"songrec"_q, u"shazam"_q, u"audd"_q, u"music"_q });
+		AddToggle(
+			builder,
+			u"songrec_online_artwork"_q,
+			isRu
+				? rpl::single(u"Загрузка обложек для найденных треков"_q)
+				: rpl::single(u"Online Artwork Fallback"_q),
+			{ u"songrec"_q, u"artwork"_q, u"cover"_q });
+		builder.addButton({
+			.id = u"extera/molten_songrec"_q,
+			.title = isRu
+				? rpl::single(u"Настройки распознавания и API AudD"_q)
+				: rpl::single(u"Recognition Provider & AudD Settings"_q),
+			.st = &st::settingsButtonNoIcon,
+			.onClick = [=] {
+				Extera::SongRec::ShowSettingsBox(controller);
+			},
+			.keywords = { u"songrec"_q, u"shazam"_q, u"audd"_q, u"token"_q },
+		});
+	});
+	AddAbout(builder, isRu
+		? rpl::single(u"Распознавание музыки через микрофон или воспроизведение звука в системе с использованием Shazam и AudD API."_q)
+		: rpl::single(u"Identify music playing around you or from system audio playback using Shazam acoustic fingerprinting and AudD API fallback."_q));
+}
+
+void PartChatsMolten(SectionBuilder &builder) {
+	PartChatsGestures(builder);
+	PartChatsUrlCleaner(builder);
+	PartChatsCustomCommands(builder);
+	PartChatsMediaAudio(builder);
+	PartChatsVoiceChanger(builder);
+	PartChatsSongRec(builder);
+}
+
+void PartPillStack(SectionBuilder &builder) {
+	[[maybe_unused]] const auto controller = builder.controller();
+	builder.addSkip();
+	builder.addSubsectionTitle(rpl::single(u"PillStack Information Badges & Navigation"_q));
+	builder.card([&] {
 		builder.addButton({
 			.id = u"extera/molten_pillstack"_q,
-			.title = rpl::single(u"PillStack Information Badges"_q),
+			.title = rpl::single(u"PillStack Badges Setup & Customization"_q),
 			.st = &st::settingsButtonNoIcon,
 			.onClick = [=] {
 				Extera::PillStack::ShowSettingsBox(controller);
@@ -1966,16 +2213,88 @@ void PartGeneral7(SectionBuilder &builder) {
 		AddToggle(
 			builder,
 			u"pillstack_enabled"_q,
-			rpl::single(u"Show PillStack Badges in Header"_q),
-			{ u"molten"_q, u"pill"_q, u"header"_q });
+			rpl::single(u"Show PillStack Badges in Sidebar Header"_q),
+			{ u"molten"_q, u"pill"_q, u"header"_q, u"sidebar"_q },
+			rpl::single(u"Display real-time telemetry and status badges above chats list"_q));
+	});
+
+	builder.addSkip();
+	builder.addSubsectionTitle(rpl::single(u"Telemetry & Hardware Monitors"_q));
+	builder.card([&] {
+		AddToggle(
+			builder,
+			u"pillstack_dc_ping"_q,
+			rpl::single(u"Data Center (DC) & Latency Ping"_q),
+			{ u"molten"_q, u"dc"_q, u"ping"_q, u"latency"_q, u"rtt"_q },
+			rpl::single(u"Socket RTT probe to active Telegram connection datacenter"_q));
+		AddToggle(
+			builder,
+			u"pillstack_net_speed"_q,
+			rpl::single(u"Network Throughput Monitor"_q),
+			{ u"molten"_q, u"speed"_q, u"bandwidth"_q, u"rx"_q, u"tx"_q },
+			rpl::single(u"Live download and upload rate measurement"_q));
+		AddToggle(
+			builder,
+			u"pillstack_ram"_q,
+			rpl::single(u"RAM / Memory Usage"_q),
+			{ u"molten"_q, u"ram"_q, u"memory"_q, u"rss"_q },
+			rpl::single(u"System RAM percentage or MoltenGram process resident memory"_q));
+	});
+
+	builder.addSkip();
+	builder.addSubsectionTitle(rpl::single(u"Privacy & Proxy Badges"_q));
+	builder.card([&] {
+		AddToggle(
+			builder,
+			u"pillstack_proxy"_q,
+			rpl::single(u"Proxy Quick Toggle Badge"_q),
+			{ u"molten"_q, u"proxy"_q, u"mtproto"_q, u"badge"_q },
+			rpl::single(u"Clicking badge instantly toggles proxy connection ON/OFF"_q));
+		AddToggle(
+			builder,
+			u"pillstack_ghost"_q,
+			rpl::single(u"Ghost Mode Quick Toggle Badge"_q),
+			{ u"molten"_q, u"ghost"_q, u"stealth"_q, u"badge"_q },
+			rpl::single(u"Clicking badge toggles stealth read/typing/online state"_q));
+	});
+
+	builder.addSkip();
+	builder.addSubsectionTitle(rpl::single(u"Weather & Market Rates"_q));
+	builder.card([&] {
+		AddToggle(
+			builder,
+			u"pillstack_weather"_q,
+			rpl::single(u"Live Weather Widget (Open-Meteo)"_q),
+			{ u"molten"_q, u"weather"_q, u"temperature"_q, u"forecast"_q },
+			rpl::single(u"Current temperature and meteorological condition for your city"_q));
+		AddToggle(
+			builder,
+			u"pillstack_weather_unit"_q,
+			rpl::single(u"Use Fahrenheit (°F) for Weather"_q),
+			{ u"molten"_q, u"fahrenheit"_q, u"celsius"_q, u"weather"_q },
+			rpl::single(u"Switch weather temperature scale between °C and °F"_q));
+		AddToggle(
+			builder,
+			u"pillstack_rates"_q,
+			rpl::single(u"Crypto & Currency Exchange Rates"_q),
+			{ u"molten"_q, u"rates"_q, u"crypto"_q, u"btc"_q, u"ton"_q, u"eth"_q, u"usd"_q, u"rub"_q },
+			rpl::single(u"Real-time prices from CoinGecko and central bank APIs"_q));
+	});
+}
+
+void PartOtherMedia(SectionBuilder &builder) {
+	[[maybe_unused]] const auto controller = builder.controller();
+	builder.addSkip();
+	builder.addSubsectionTitle(rpl::single(u"Music, Voice & Tools"_q));
+	builder.card([&] {
 		builder.addButton({
-			.id = u"extera/molten_device_spoof"_q,
-			.title = rpl::single(u"Device & Session Spoofing"_q),
+			.id = u"extera/molten_playlists"_q,
+			.title = rpl::single(u"My Local Playlists"_q),
 			.st = &st::settingsButtonNoIcon,
 			.onClick = [=] {
-				Extera::DeviceSpoof::ShowSettingsBox(controller);
+				Extera::Playlists::ShowPlaylistsBox(controller);
 			},
-			.keywords = { u"device"_q, u"spoof"_q, u"session"_q, u"model"_q, u"android"_q, u"ios"_q },
+			.keywords = { u"molten"_q, u"playlist"_q, u"music"_q, u"audio"_q },
 		});
 		builder.addButton({
 			.id = u"extera/molten_nowplaying"_q,
@@ -1994,15 +2313,6 @@ void PartGeneral7(SectionBuilder &builder) {
 				Extera::SongRec::ShowSettingsBox(controller);
 			},
 			.keywords = { u"songrec"_q, u"shazam"_q, u"audd"_q, u"music"_q, u"recognition"_q },
-		});
-		builder.addButton({
-			.id = u"extera/molten_chat_extras"_q,
-			.title = rpl::single(u"Double-Tap & Deleted Quotes"_q),
-			.st = &st::settingsButtonNoIcon,
-			.onClick = [=] {
-				Extera::ChatExtras::ShowSettingsBox(controller);
-			},
-			.keywords = { u"doubletap"_q, u"reply"_q, u"quotes"_q, u"reaction"_q },
 		});
 		builder.addButton({
 			.id = u"extera/molten_voice_changer"_q,
@@ -2037,6 +2347,11 @@ void PartAppearance0(SectionBuilder &builder) {
 			.onClick = [=] { Extera::Md3::ShowSettingsBox(controller); },
 			.keywords = { u"material"_q, u"md3"_q, u"design"_q },
 		});
+		AddToggle(
+			builder,
+			u"md3_progress"_q,
+			tr::lng_exd_md3_progress(),
+			{ u"md3"_q, u"progress"_q });
 	});
 	AddAbout(builder, tr::lng_exd_md3_about());
 
@@ -2136,6 +2451,7 @@ void PartAppearance3(SectionBuilder &builder) {
 	[[maybe_unused]] const auto controller = builder.controller();
 
 	builder.addSkip();
+	builder.addSubsectionTitle(tr::lng_extera_app_icon());
 	builder.card([&] {
 		builder.addButton({
 			.id = u"extera/app_icon"_q,
@@ -2143,58 +2459,54 @@ void PartAppearance3(SectionBuilder &builder) {
 			.icon = { &st::exteraIconAppearance },
 			.onClick = [=] { ShowAppIconBox(controller); },
 		});
+		builder.addButton({
+			.id = u"extera/icon_packs"_q,
+			.title = tr::lng_exd_icon_packs(),
+			.icon = { &st::exteraIconAppearance },
+			.onClick = [=] { Extera::Md3::ShowIconPacksBox(controller); },
+		});
 	});
-
-	builder.addDivider();
+	AddAbout(builder, tr::lng_exd_icon_packs_about());
 }
 
 void PartAppearance4(SectionBuilder &builder) {
 	[[maybe_unused]] const auto controller = builder.controller();
 
 	builder.addSkip();
-	builder.addSubsectionTitle(tr::lng_extera_appearance());
+	builder.addSubsectionTitle(tr::lng_exd_monet_dynamic());
 	builder.card([&] {
-		const auto settings = &Core::App().settings();
-		AddCoreToggle(
-			builder,
-			u"system_fonts"_q,
-			tr::lng_extera_system_fonts(),
-			[=] {
-				return settings->customFontFamily() == style::SystemFontTag();
-			},
-			[=](bool v) {
-				settings->setCustomFontFamily(v
-					? style::SystemFontTag()
-					: QString());
-				Core::App().saveSettings();
-				controller->show(Ui::MakeConfirmBox({
-					.text = tr::lng_extera_restart_required(),
-					.confirmed = [] { Core::Restart(); },
-					.confirmText = tr::lng_extera_restart(),
-				}));
-			});
 		AddToggle(
 			builder,
-			u"system_emoji"_q,
-			tr::lng_extera_system_emoji());
+			u"md3_monet_dynamic"_q,
+			tr::lng_exd_monet_dynamic(),
+			{ u"monet"_q, u"palette"_q, u"material"_q, u"color"_q });
+		builder.addButton({
+			.id = u"extera/monet_color"_q,
+			.title = tr::lng_exd_monet_color(),
+			.st = &st::settingsButtonNoIcon,
+			.onClick = [=] {
+				Extera::Md3::ShowMonetColorBox(controller);
+			},
+			.keywords = { u"monet"_q, u"accent"_q, u"color"_q, u"palette"_q },
+		});
 		AddToggle(
 			builder,
 			u"custom_chat_themes"_q,
 			tr::lng_extera_custom_themes());
 		AddToggle(
 			builder,
-			u"exd_profile_music_card"_q,
-			tr::lng_exd_profile_music_card(),
-			{ u"music"_q, u"profile"_q, u"player"_q });
+			u"colored_text"_q,
+			rpl::single(u"Colored Text (tg://color)"_q),
+			{ u"molten"_q, u"color"_q, u"text"_q });
 	});
-	AddAbout(builder, tr::lng_extera_custom_themes_about());
+	AddAbout(builder, tr::lng_exd_monet_color_about());
 
 	builder.addSkip();
-	builder.addSubsectionTitle(rpl::single(u"MoltenGram Visuals & Player"_q));
+	builder.addSubsectionTitle(rpl::single(u"MoltenGram Visuals & Glass"_q));
 	builder.card([&] {
 		builder.addButton({
 			.id = u"extera/molten_avatar_shapes"_q,
-			.title = rpl::single(u"MD3 Expressive Avatar Shapes"_q),
+			.title = rpl::single(u"MD3 Expressive Avatar Shapes (44 shapes)"_q),
 			.st = &st::settingsButtonNoIcon,
 			.onClick = [=] {
 				Extera::AvatarShapes::ShowSettingsBox(controller);
@@ -2232,10 +2544,44 @@ void PartAppearance4(SectionBuilder &builder) {
 			{ u"molten"_q, u"player"_q, u"cover"_q, u"music"_q });
 		AddToggle(
 			builder,
-			u"colored_text"_q,
-			rpl::single(u"Colored Text (tg://color)"_q),
-			{ u"molten"_q, u"color"_q, u"text"_q });
+			u"exd_profile_music_card"_q,
+			tr::lng_exd_profile_music_card(),
+			{ u"music"_q, u"profile"_q, u"player"_q });
 	});
+
+	builder.addSkip();
+	builder.addSubsectionTitle(rpl::single(u"Typography & Emojis"_q));
+	builder.card([&] {
+		const auto settings = &Core::App().settings();
+		AddCoreToggle(
+			builder,
+			u"system_fonts"_q,
+			tr::lng_extera_system_fonts(),
+			[=] {
+				return settings->customFontFamily() == style::SystemFontTag();
+			},
+			[=](bool v) {
+				settings->setCustomFontFamily(v
+					? style::SystemFontTag()
+					: QString());
+				Core::App().saveSettings();
+				controller->show(Ui::MakeConfirmBox({
+					.text = tr::lng_extera_restart_required(),
+					.confirmed = [] { Core::Restart(); },
+					.confirmText = tr::lng_extera_restart(),
+				}));
+			});
+		AddToggle(
+			builder,
+			u"system_emoji"_q,
+			tr::lng_extera_system_emoji());
+		AddToggle(
+			builder,
+			u"noto_animated_emoji"_q,
+			tr::lng_exd_noto_emoji(),
+			{ u"noto"_q, u"emoji"_q, u"animated"_q });
+	});
+	AddAbout(builder, tr::lng_exd_noto_emoji_about());
 }
 
 void PartChats0(SectionBuilder &builder) {
@@ -3043,47 +3389,6 @@ void PartOther0(SectionBuilder &builder) {
 }
 
 void PartOther1(SectionBuilder &builder) {
-	[[maybe_unused]] const auto controller = builder.controller();
-
-	builder.addSkip();
-	builder.addSubsectionTitle(tr::lng_exd_donate());
-	builder.card([&] {
-		const auto wallet = [&](
-				const QString &id,
-				rpl::producer<QString> title,
-				const QString &address) {
-			builder.addButton({
-				.id = u"extera/donate_"_q + id,
-				.title = std::move(title),
-				.icon = { &st::menuIconCopy },
-				.label = rpl::single((id == u"card"_q)
-					? address
-					: (address.left(6)
-						+ QString::fromUtf8("\xE2\x80\xA6")
-						+ address.right(4))),
-				.onClick = [=] {
-					QGuiApplication::clipboard()->setText(
-						QString(address).remove(' '));
-					controller->showToast(
-						tr::lng_exd_donate_copied(tr::now));
-				},
-				.keywords = { u"donate"_q, u"crypto"_q },
-			});
-		};
-		wallet(
-			u"card"_q,
-			tr::lng_exd_donate_card(),
-			u"2200 7021 9261 6667"_q);
-		wallet(
-			u"ton"_q,
-			tr::lng_exd_donate_ton(),
-			u"UQBBklguWPdtllk0jUozVZm6DLqbEzqsXUZ0lK6tiKGxAS0T"_q);
-		wallet(
-			u"usdt"_q,
-			tr::lng_exd_donate_usdt(),
-			u"TPbiCARyfZpUgFtQsuHsKVikphB6viD2jk"_q);
-	});
-	AddAbout(builder, tr::lng_exd_donate_about());
 }
 
 void PartOther2(SectionBuilder &builder) {
@@ -3547,6 +3852,7 @@ void FillSearchResults(
 		ExteraNetworkId(),
 		ExteraUpdatesId(),
 		ExteraSupportId(),
+		ExteraOtherId(),
 	};
 }
 
@@ -3592,14 +3898,13 @@ void AddCategorySearch(
 // Grid
 
 const char *kCardSvgs[] = {
+	R"exd(<svg xmlns="http://www.w3.org/2000/svg" height="24" viewBox="0 -960 960 960" width="24"><path fill="#ffffff" d="m370-80-16-128q-13-5-24.5-12T307-235l-119 50L78-375l103-78q-1-7-1-13.5v-27q0-6.5 1-13.5L78-585l110-190 119 50q11-8 23-15t24-12l16-128h220l16 128q13 5 24.5 12t22.5 15l119-50 110 190-103 78q1 7 1 13.5v27q0 6.5-2 13.5l103 78-110 190-118-50q-11 8-23 15t-24 12L590-80H370Zm112-280q50 0 85-35t35-85q0-50-35-85t-85-35q-50 0-85 35t-35 85q0 50 35 85t85 35Z"/></svg>)exd",
 	R"exd(<svg xmlns="http://www.w3.org/2000/svg" height="24" viewBox="0 -960 960 960" width="24"><path fill="#ffffff" d="M480-60.78q-85.86 0-162.3-33.2-76.44-33.19-133.48-90.24-57.05-57.04-90.24-133.49-33.2-76.45-33.2-162.32 0-86.93 33.63-163.32 33.63-76.39 91.68-133.22 58.04-56.82 135.39-89.74 77.35-32.91 165.16-32.91 83.62 0 158.3 28.91 74.67 28.92 131.28 79.96 56.61 51.05 89.8 120.77 33.2 69.72 33.2 150.45 0 118.39-70.85 188.37t-178.2 69.98h-60.99q-6.74 0-9.96 3.87-3.22 3.87-3.22 9.3 0 10.87 11.61 26.59t11.61 41.89q0 54.52-33.72 86.43-33.72 31.92-85.5 31.92ZM309.78-457q17-17 17-43t-17-43q-17-17-43-17t-43 17q-17 17-17 43t17 43q17 17 43 17t43-17Zm116.61-154.91q17-17 17-43t-17-43q-17-17-43-17t-43 17q-17 17-17 43t17 43q17 17 43 17t43-17Zm193.22 0q17-17 17-43t-17-43q-17-17-43-17t-43 17q-17 17-17 43t17 43q17 17 43 17t43-17ZM734.52-457q17-17 17-43t-17-43q-17-17-43-17t-43 17q-17 17-17 43t17 43q17 17 43 17t43-17Z"/></svg>)exd",
 	R"exd(<svg xmlns="http://www.w3.org/2000/svg" height="24" viewBox="0 -960 960 960" width="24"><path fill="#ffffff" d="m220.78-220.78-69.39 69.39q-25.22 25.22-57.91 11.61-32.7-13.61-32.7-49.09v-604.35q0-44.3 30.85-75.15 30.85-30.85 75.15-30.85h626.44q44.3 0 75.15 30.85 30.85 30.85 30.85 75.15v466.44q0 44.3-30.85 75.15-30.85 30.85-75.15 30.85H220.78ZM280-400h240q17 0 28.5-11.5T560-440q0-17-11.5-28.5T520-480H280q-17 0-28.5 11.5T240-440q0 17 11.5 28.5T280-400Zm0-120h400q17 0 28.5-11.5T720-560q0-17-11.5-28.5T680-600H280q-17 0-28.5 11.5T240-560q0 17 11.5 28.5T280-520Zm0-120h400q17 0 28.5-11.5T720-680q0-17-11.5-28.5T680-720H280q-17 0-28.5 11.5T240-680q0 17 11.5 28.5T280-640Z"/></svg>)exd",
-	R"exd(<svg xmlns="http://www.w3.org/2000/svg" height="24" viewBox="0 -960 960 960" width="24"><path fill="#ffffff" d="m600.74-159.04-22.13 63.65q-5.13 15.52-18.81 25.06-13.67 9.55-30.19 9.55-26.78 0-42.96-21.87-16.17-21.87-6.48-48.09l144.09-398.04q6.7-17.22 21.5-27.61t33.02-10.39h41.87q18.22 0 33.02 10.39 14.81 10.39 21.51 27.61l144.08 397.91q9.7 25.78-6.26 47.94-15.96 22.15-43.3 22.15-16.96 0-30.7-9.55-13.74-9.54-19.87-26.06l-21.56-62.65H600.74Zm-252.31-213.7L188-212.74q-15.52 15.52-36.83 15.46-21.3-.07-37.26-16.02-15.52-15.53-15.52-37.33 0-21.8 15.52-37.33l161-161q-40.65-41.78-70.56-87.06-29.92-45.28-51.66-97.2h116.79q15.48 29.96 34.91 56.13 19.44 26.18 45.17 53.48 31.87-34.13 64.83-88.83 32.96-54.69 49.26-100.78H70.39q-22.09 0-37.54-15.45-15.46-15.46-15.46-37.55 0-22.08 15.46-37.54 15.45-15.46 37.54-15.46h227v-27q0-22.08 15.46-37.54 15.45-15.46 37.54-15.46t37.54 15.46q15.46 15.46 15.46 37.54v27h227q22.09 0 37.54 15.46 15.46 15.46 15.46 37.54 0 22.09-15.46 37.55-15.45 15.45-37.54 15.45H575.3q-22.13 69.18-64.97 144.61-42.85 75.44-87.24 121.09l68.87 70.3-39.61 110.83-103.92-106.35Zm285.22 117.7h130.44l-65.22-189.31-65.22 189.31Z"/></svg>)exd",
 	R"exd(<svg xmlns="http://www.w3.org/2000/svg" height="24" viewBox="0 -960 960 960" width="24"><path fill="#ffffff" d="M246.78-62.48q-43.72 0-74.86-31.14-31.14-31.13-31.14-74.86v-386.43q0-43.73 31.14-74.87 31.14-31.13 74.86-31.13h24.74v-63.61q0-87.52 60.76-148.85T480-934.7q86.96 0 147.72 61.33 60.76 61.33 60.76 148.85v63.61h24.74q43.72 0 74.86 31.13 31.14 31.14 31.14 74.87v386.43q0 43.73-31.14 74.86-31.14 31.14-74.86 31.14H246.78ZM536.5-305.2q23.5-23.5 23.5-56.5t-23.5-56.5Q513-441.7 480-441.7t-56.5 23.5Q400-394.7 400-361.7t23.5 56.5q23.5 23.5 56.5 23.5t56.5-23.5ZM377.52-660.91h204.96v-63.61q0-43.41-29.63-73.79Q523.22-828.7 480-828.7t-72.85 30.39q-29.63 30.38-29.63 73.79v63.61Z"/></svg>)exd",
-	R"exd(<svg xmlns="http://www.w3.org/2000/svg" height="24" viewBox="0 -960 960 960" width="24"><path fill="#ffffff" d="M409-149q-29-29-29-71t29-71q29-29 71-29t71 29q29 29 29 71t-29 71q-29 29-71 29t-71-29Zm209.83-388.13q65.52 22.87 119.95 62.61 22.26 16.13 23.05 44.02.78 27.89-19.48 48.15-19.83 19.83-48.22 21.18-28.39 1.34-51.78-13.79-35.18-22.6-75.81-35.06T480-422.48q-45.35 0-85.7 12.18-40.34 12.17-75.52 34.78-23.95 15.13-52.63 13.85-28.67-1.29-48.5-21.11-19.82-20.26-19.26-47.87.57-27.61 22.83-43.74 54.43-39.74 119.95-62.68Q406.7-560 480-560q73.3 0 138.83 22.87Zm92.43-223q108.52 39.87 195.96 112.04 22.82 18.7 24.39 46.81 1.56 28.11-19.26 48.93-19.83 19.83-48.22 20.61-28.39.78-51.78-16.91-69.74-54.48-153.59-84.15-83.85-29.68-178.76-29.68T301.24-632.8q-83.85 29.67-153.59 84.15-23.39 17.69-51.5 16.91-28.11-.78-47.93-20.61-20.83-20.82-19.55-48.93 1.29-28.11 24.11-46.81 87.44-72.17 195.96-112.04Q357.26-800 480-800t231.26 39.87Z"/></svg>)exd",
-	R"exd(<svg xmlns="http://www.w3.org/2000/svg" height="24" viewBox="0 -960 960 960" width="24"><path fill="#ffffff" d="M193.78-100.78q-39.08 0-66.32-27.24-27.24-27.24-27.24-66.33v-121.61q0-15.52 10.54-26.84 10.54-11.33 26.07-15.03 36.73-9.69 61.47-36.78 24.74-27.09 24.74-64.26 0-37.3-24.45-63.89-24.46-26.59-61.2-36.72-14.96-4.13-25.78-15.74-10.83-11.61-10.83-26.56v-124.44q0-38.65 27.18-65.82 27.17-27.18 66.39-27.18h114.08q10.96-51 53.07-87.19 42.11-36.2 97.37-36.2 58.22 0 100.89 36.2 42.68 36.19 50.11 87.19h115.78q38.65 0 66.11 27.18 27.46 27.17 27.46 65.82v131.74q36 20.26 58.85 56.52 22.84 36.26 22.84 79.09 0 44.96-22.84 82.07-22.85 37.1-58.85 53.54v128.91q0 39.09-27.46 66.33-27.46 27.24-66.11 27.24H193.78Z"/></svg>)exd",
-	R"exd(<svg xmlns="http://www.w3.org/2000/svg" height="24" viewBox="0 -960 960 960" width="24"><path fill="#ffffff" d="M480.57-100.78q-78.4 0-147.57-29.91-69.17-29.92-120.5-81.24-51.33-51.33-81.24-120.5-29.91-69.18-29.91-147.57 0-78.39 29.91-147.57 29.91-69.17 81.24-120.5 51.33-51.32 120.5-81.24 69.17-29.91 147.57-29.91 83.13 0 157.19 33.87 74.07 33.87 127.89 96.74v-41.56q0-18.7 12.92-31.33 12.91-12.63 31.6-12.63 18.7 0 31.33 12.63 12.63 12.63 12.63 31.33V-613q0 22.09-15.46 37.54Q823.22-560 801.13-560H643.96q-18.7 0-31.89-13.2-13.2-13.19-13.2-31.89 0-18.69 12.91-31.61 12.92-12.91 31.61-12.91h49.65q-39.3-49.22-94.78-76.41-55.48-27.2-117.69-27.2-114.18 0-193.7 79.52-79.52 79.53-79.52 193.7 0 114.17 79.52 193.7 79.52 79.52 193.7 79.52 89.91 0 160.67-52.2 70.76-52.19 97.59-135.41 6.69-19.96 24.5-30.5 17.8-10.54 38.89-7.41 22.08 3.13 35.48 19.3 13.39 16.17 7.69 35.7-32.95 121.26-133.91 198.89-100.96 77.63-230.91 77.63ZM524.52-496l94.91 94.35q12.7 12.69 12.7 31.39 0 18.69-12.7 31.39-12.69 12.7-31.39 12.7-18.69 0-31.39-12.7L451.43-444.09q-7.69-7.69-11.54-17.17-3.85-9.48-3.85-20.31v-154.47q0-18.7 12.92-31.33Q461.87-680 480.57-680q18.69 0 31.32 12.63 12.63 12.63 12.63 31.33V-496Z"/></svg>)exd",
-	R"exd(<svg xmlns="http://www.w3.org/2000/svg" height="24" viewBox="0 -960 960 960" width="24"><path fill="#ffffff" d="M441.61-137.02q-18.74-6.98-33.7-21.37l-70.13-64.13Q232.91-317.83 146.85-415.3 60.78-512.78 60.78-634q0-102.48 68.09-171.13 68.09-68.65 170.56-68.65 51.87 0 98.31 19.95 46.43 19.96 81.69 56.7 35.27-36.74 81.7-56.7 46.44-19.95 98.3-19.95 102.48 0 171.42 68.65 68.93 68.65 68.93 171.13 0 121.22-86.41 219.2-86.41 97.97-193.28 193.84l-68.57 63.13q-14.95 14.4-33.98 21.09-19.02 6.7-38.11 6.7-19.08 0-37.82-6.98Z"/></svg>)exd",
+	R"exd(<svg xmlns="http://www.w3.org/2000/svg" height="24" viewBox="0 -960 960 960" width="24"><path fill="#ffffff" d="M120-520v-320h320v320H120Zm400 0v-320h320v320H520ZM120-120v-320h320v320H120Zm400 0v-320h320v320H520Z"/></svg>)exd",
+	R"exd(<svg xmlns="http://www.w3.org/2000/svg" height="24" viewBox="0 -960 960 960" width="24"><path fill="#ffffff" d="m480-120-42-94-94-42 94-42 42-94 42 94 94 42-94 42-42 94Zm0-360-70-154-154-70 154-70 70-154 70 154 154 70-154 70-70 154Zm260 360-28-62-62-28 62-28 28-62 28 62 62 28-62 28-28 62Z"/></svg>)exd",
+	R"exd(<svg xmlns="http://www.w3.org/2000/svg" height="24" viewBox="0 -960 960 960" width="24"><path fill="#ffffff" d="M200-200h160v-160H200v160Zm0-240h160v-160H200v160Zm0-240h160v-160H200v160Zm240 480h160v-160H440v160Zm0-240h160v-160H440v160Zm0-240h160v-160H440v160Zm240 480h160v-160H680v160Zm0-240h160v-160H680v160Zm0-240h160v-160H680v160Z"/></svg>)exd",
 };
 
 struct CategoryCard {
@@ -3619,6 +3924,11 @@ void AddCategoryGrid(SectionBuilder &builder) {
 	builder.add([=](const WidgetContext &ctx) {
 		const auto cards = std::make_shared<std::vector<CategoryCard>>(
 			std::vector<CategoryCard>{
+			{ [] { return tr::lng_extera_general(); },
+				[] { return rpl::single(u"Profile, spoofing, archive & performance"_q); },
+				&st::menuIconSettings,
+				ExteraGeneralId,
+				QColor(0x3A, 0x9B, 0xF0) },
 			{ [] { return tr::lng_extera_appearance(); },
 				[] { return tr::lng_exd_cat_appearance_about(); },
 				&st::menuIconPalette,
@@ -3627,11 +3937,6 @@ void AddCategoryGrid(SectionBuilder &builder) {
 			{ [] { return tr::lng_exd_cat_messages(); },
 				[] { return tr::lng_exd_cat_messages_about(); },
 				&st::exteraIconChats,
-				ExteraGeneralId,
-				QColor(0x3A, 0x9B, 0xF0) },
-			{ [] { return tr::lng_exd_cat_translate(); },
-				[] { return tr::lng_exd_cat_translate_about(); },
-				&st::exteraIconTranslate,
 				ExteraChatsId,
 				QColor(0x26, 0xB0, 0xA2) },
 			{ [] { return tr::lng_exd_cat_privacy(); },
@@ -3639,26 +3944,21 @@ void AddCategoryGrid(SectionBuilder &builder) {
 				&st::menuIconLock,
 				ExteraPrivacyId,
 				QColor(0x5B, 0x6B, 0xE8) },
-			{ [] { return tr::lng_exd_cat_network(); },
-				[] { return tr::lng_exd_cat_network_about(); },
-				&st::menuIconNetwork,
-				ExteraNetworkId,
+			{ [] { return tr::lng_extera_nav_title(); },
+				[] { return rpl::single(u"PillStack badges & drawer navigation"_q); },
+				&st::menuIconReorder,
+				ExteraNavigationId,
 				QColor(0xF0, 0x8A, 0x3A) },
-			{ [] { return tr::lng_exd_cat_plugins(); },
-				[] { return tr::lng_exd_cat_plugins_about(); },
-				&st::exteraIconPlugins,
-				ExteraPluginsId,
+			{ [] { return tr::lng_extera_ai_chat(); },
+				[] { return rpl::single(u"AI assistant, models & generation"_q); },
+				&st::exdMenuIconAi,
+				ExteraAiChatId,
 				QColor(0xE2, 0x55, 0x7B) },
-			{ [] { return tr::lng_exd_cat_updates(); },
-				[] { return tr::lng_exd_cat_updates_about(); },
-				&st::menuIconRestore,
-				ExteraUpdatesId,
+			{ [] { return tr::lng_extera_other(); },
+				[] { return rpl::single(u"Media, playlists, backup, updates & tools"_q); },
+				&st::exteraIconOther,
+				ExteraOtherId,
 				QColor(0x3C, 0xB3, 0x71) },
-			{ [] { return tr::lng_exd_cat_support(); },
-				[] { return tr::lng_exd_cat_support_about(); },
-				&st::menuIconLike,
-				ExteraSupportId,
-				QColor(0xF2, 0x54, 0x5B) },
 		});
 		const auto count = int(cards->size());
 		const auto rows = (count + 1) / 2;
@@ -3702,11 +4002,20 @@ void AddCategoryGrid(SectionBuilder &builder) {
 			}, grid->lifetime());
 		}
 		const auto cardRect = [=](int index) {
-			const auto width = (grid->width() - skip) / 2;
+			const auto halfWidth = (grid->width() - skip) / 2;
+			if (index == count - 1 && (count % 2) != 0) {
+				return QRect(
+					0,
+					(index / 2) * (cardHeight + skip),
+					grid->width(),
+					cardHeight);
+			}
+			const auto isRight = (index % 2) == 1;
+			const auto w = isRight ? (grid->width() - (halfWidth + skip)) : halfWidth;
 			return QRect(
-				(index % 2) * (width + skip),
+				isRight ? (halfWidth + skip) : 0,
 				(index / 2) * (cardHeight + skip),
-				width,
+				w,
 				cardHeight);
 		};
 		const auto cardAt = [=](QPoint point) {
@@ -3743,10 +4052,11 @@ void AddCategoryGrid(SectionBuilder &builder) {
 				}
 				const auto row = index / 2;
 				const auto left = (index % 2) == 0;
+				const auto isLastFull = (index == count - 1 && (count % 2) != 0);
 				const auto tl = (row == 0 && left) ? big : small;
 				const auto tr = (row == 0 && !left) ? big : small;
-				const auto br = small;
-				const auto bl = small;
+				const auto br = (isLastFull || (row == rows - 1 && !left)) ? big : small;
+				const auto bl = (isLastFull || (row == rows - 1 && left)) ? big : small;
 				path.moveTo(r.left() + tl, r.top());
 				path.lineTo(r.right() - tr, r.top());
 				path.quadTo(r.right(), r.top(), r.right(), r.top() + tr);
@@ -4135,7 +4445,23 @@ void BuildAiChat(SectionBuilder &builder) {
 			.id = u"extera/ai_service"_q,
 			.title = tr::lng_extera_ai_service(),
 			.icon = { &st::exteraIconWebsite },
-			.label = rpl::single(u"Google Gemini"_q),
+			.label = Config().intChanges(
+				u"ai_chat_provider"_q
+			) | rpl::map([](int provider) {
+				switch (provider) {
+				case 1: return u"OpenAI"_q;
+				case 2: return u"OpenRouter"_q;
+				case 3: return u"DeepSeek"_q;
+				case 4: return u"Ollama (Local)"_q;
+				case 5: return u"Custom Endpoint"_q;
+				default: return u"Google Gemini"_q;
+				}
+			}),
+			.onClick = [=] {
+				if (controller) {
+					Extera::ShowAiSettingsBox(controller);
+				}
+			},
 		});
 		builder.addButton({
 			.id = u"extera/ai_key"_q,
@@ -4150,7 +4476,24 @@ void BuildAiChat(SectionBuilder &builder) {
 			}),
 			.onClick = [=] {
 				if (controller) {
-					Extera::ShowKeyBox(controller);
+					Extera::ShowAiSettingsBox(controller);
+				}
+			},
+		});
+		builder.addButton({
+			.id = u"extera/ai_config"_q,
+			.title = rpl::single(u"AI Model & Endpoint Settings"_q),
+			.icon = { &st::menuIconSettings },
+			.label = Config().stringChanges(
+				u"ai_chat_custom_model"_q
+			) | rpl::map([](const QString &model) {
+				return model.trimmed().isEmpty()
+					? u"Configure"_q
+					: model.trimmed();
+			}),
+			.onClick = [=] {
+				if (controller) {
+					Extera::ShowAiSettingsBox(controller);
 				}
 			},
 		});
@@ -4220,63 +4563,55 @@ void BuildAiChat(SectionBuilder &builder) {
 	AddAbout(builder, tr::lng_extera_ai_about());
 }
 
-// Navigation
-
-void BuildNavigation(SectionBuilder &builder) {
-	builder.addSkip();
-	builder.add([=](const WidgetContext &ctx) {
-		auto list = object_ptr<Ui::VerticalLayout>(ctx.container);
-		Extera::Navigation::FillSettings(list.data());
-		return SectionBuilder::WidgetToAdd{ .widget = std::move(list) };
-	});
-}
-
-// Other
-
-
-// Main
-
-
-void BuildMessages(SectionBuilder &builder) {
-	AddCategorySearch(builder, { ExteraGeneralId() }, [&] {
-		PartChats4(builder);
-		PartChats5(builder);
-		PartChats3(builder);
-		PartChats2(builder);
-		PartChats6(builder);
-		PartChats7(builder);
-	});
-}
-
 void PartPremium(SectionBuilder &builder);
 
-void BuildAppearance(SectionBuilder &builder) {
-	AddCategorySearch(builder, {
-		ExteraAppearanceId(),
-		ExteraNavigationId(),
-	}, [&] {
-		PartAppearance0(builder);
-		PartAppearance1(builder);
-		PartAppearance2(builder);
-		PartAppearance3(builder);
-		PartAppearance4(builder);
+void BuildGeneral(SectionBuilder &builder) {
+	AddCategorySearch(builder, { ExteraGeneralId() }, [&] {
+		PartGeneralProfile(builder);
+		PartGeneralDevice(builder);
+		PartGeneralArchive(builder);
 		PartGeneral3(builder);
-		PartChats0(builder);
+		PartGeneral4(builder);
+		PartGeneral5(builder);
+		PartGeneral1(builder);
 		PartPremium(builder);
-		builder.addSkip();
-		builder.card([&] {
-			builder.addSectionButton({
-				.title = tr::lng_extera_nav_title(),
-				.targetSection = ExteraNavigationId(),
-				.icon = { &st::menuIconReorder },
-			});
-		});
 	});
 }
 
-void BuildTranslate(SectionBuilder &builder) {
+void BuildAppearance(SectionBuilder &builder) {
+	AddCategorySearch(builder, { ExteraAppearanceId() }, [&] {
+		PartAppearance0(builder);
+		PartAppearance4(builder);
+		PartAppearance3(builder);
+		PartAppearance2(builder);
+		PartAppearance1(builder);
+	});
+}
+
+void BuildChats(SectionBuilder &builder) {
 	AddCategorySearch(builder, { ExteraChatsId() }, [&] {
+		PartChatsMolten(builder);
+		PartChats3(builder);
+		PartChats0(builder);
+		PartChats4(builder);
+		PartChats5(builder);
 		PartGeneral2(builder);
+		PartChats6(builder);
+		PartChats7(builder);
+		PartChats2(builder);
+	});
+}
+
+void BuildNavigation(SectionBuilder &builder) {
+	AddCategorySearch(builder, { ExteraNavigationId() }, [&] {
+		PartPillStack(builder);
+		builder.addSkip();
+		builder.addSubsectionTitle(tr::lng_extera_nav_title());
+		builder.add([=](const WidgetContext &ctx) {
+			auto list = object_ptr<Ui::VerticalLayout>(ctx.container);
+			Extera::Navigation::FillSettings(list.data());
+			return SectionBuilder::WidgetToAdd{ .widget = std::move(list) };
+		});
 	});
 }
 
@@ -4316,21 +4651,47 @@ void PartAyuInner(SectionBuilder &builder) {
 	builder.addSkip();
 	builder.addSubsectionTitle(tr::lng_exd_ayu_ghost());
 	builder.card([&] {
-		AddSwitchGroup(
+		AddToggle(
 			builder,
-			u"ghost_mode"_q,
-			tr::lng_exd_ayu_ghost_mode,
-			{
-				{ u"ghost_read"_q, &tr::lng_exd_ayu_ghost_read },
-				{ u"ghost_stories"_q, &tr::lng_exd_ayu_ghost_stories },
-				{ u"ghost_online"_q, &tr::lng_exd_ayu_ghost_online },
-				{ u"ghost_typing"_q, &tr::lng_exd_ayu_ghost_typing },
-				{ u"ghost_offline"_q, &tr::lng_exd_ayu_ghost_offline },
-			});
+			u"ghost_read"_q,
+			tr::lng_exd_ayu_ghost_read(),
+			{ u"ghost"_q, u"read"_q, u"receipts"_q, u"messages"_q });
+		AddToggle(
+			builder,
+			u"ghost_stories"_q,
+			tr::lng_exd_ayu_ghost_stories(),
+			{ u"ghost"_q, u"stories"_q, u"views"_q, u"receipts"_q });
+		AddToggle(
+			builder,
+			u"ghost_online"_q,
+			tr::lng_exd_ayu_ghost_online(),
+			{ u"ghost"_q, u"online"_q, u"status"_q, u"presence"_q });
+		AddToggle(
+			builder,
+			u"ghost_typing"_q,
+			tr::lng_exd_ayu_ghost_typing(),
+			{ u"ghost"_q, u"typing"_q, u"recording"_q, u"voice"_q, u"video"_q });
+		AddToggle(
+			builder,
+			u"ghost_offline"_q,
+			tr::lng_exd_ayu_ghost_offline(),
+			{ u"ghost"_q, u"offline"_q });
 		AddToggle(
 			builder,
 			u"ayu_ghost_read_after"_q,
-			tr::lng_exd_ayu_ghost_read_after());
+			tr::lng_exd_ayu_ghost_read_after(),
+			{ u"ghost"_q, u"read"_q, u"after"_q });
+		builder.addButton({
+			.id = u"extera/ghost_toggle_all"_q,
+			.title = Extera::GhostActiveValue() | rpl::map([](bool active) {
+				return active ? u"Turn Off Ghost Mode"_q : u"Turn On Ghost Mode (All)"_q;
+			}),
+			.st = &st::settingsButtonNoIcon,
+			.onClick = [=] {
+				Extera::SetGhostAll(!Extera::GhostActive());
+			},
+			.keywords = { u"ghost"_q, u"all"_q, u"toggle"_q },
+		});
 	});
 	AddAbout(builder, tr::lng_exd_ayu_ghost_about());
 
@@ -4341,7 +4702,12 @@ void PartAyuInner(SectionBuilder &builder) {
 			builder,
 			u"ayu_keep_deleted"_q,
 			tr::lng_exd_ayu_save_deleted(),
-			{ u"deleted"_q });
+			{ u"deleted"_q, u"messages"_q, u"retention"_q });
+		AddToggle(
+			builder,
+			u"ayu_bypass_protection"_q,
+			tr::lng_exd_ayu_bypass_protection(),
+			{ u"protected"_q, u"copy"_q, u"screenshot"_q, u"ttl"_q, u"media"_q });
 		AddToggle(
 			builder,
 			u"ayu_edit_history"_q,
@@ -4350,16 +4716,23 @@ void PartAyuInner(SectionBuilder &builder) {
 		AddToggle(
 			builder,
 			u"ayu_save_bots"_q,
-			tr::lng_exd_ayu_save_bots());
+			tr::lng_exd_ayu_save_bots(),
+			{ u"bots"_q, u"save"_q });
 		AddToggle(
 			builder,
-			u"ayu_bypass_protection"_q,
-			tr::lng_exd_ayu_bypass_protection(),
-			{ u"protected"_q, u"copy"_q, u"screenshot"_q });
+			u"molten_deleted_reply_quote"_q,
+			rpl::single(u"Preserve Deleted Reply Quotes"_q),
+			{ u"deleted"_q, u"quote"_q, u"reply"_q, u"retention"_q });
+		AddToggle(
+			builder,
+			u"molten_reply_to_deleted_as_quote"_q,
+			rpl::single(u"Quote Deleted Messages in New Replies"_q),
+			{ u"deleted"_q, u"quote"_q, u"reply"_q, u"rewrite"_q });
 		AddToggle(
 			builder,
 			u"translucent_deleted"_q,
-			tr::lng_exd_translucent_deleted());
+			tr::lng_exd_translucent_deleted(),
+			{ u"translucent"_q, u"deleted"_q, u"transparency"_q });
 		AddPreview(
 			builder,
 			u"deleted_mark"_q,
@@ -4554,7 +4927,7 @@ void BuildPrivacy(SectionBuilder &builder) {
 	AddCategorySearch(builder, { ExteraPrivacyId() }, [&] {
 		PartGeneral0(builder);
 		PartGeneral6(builder);
-		PartGeneral7(builder);
+		PartPrivacySecurity(builder);
 		PartAyu(builder);
 	});
 }
@@ -4833,27 +5206,27 @@ void BuildOther(SectionBuilder &builder) {
 	if (!builder.controller()) {
 		return;
 	}
-	PartOther0(builder);
-	PartOther1(builder);
-	PartOther2(builder);
-	PartOther3(builder);
-	PartOtherSync(builder);
+	AddCategorySearch(builder, {
+		ExteraOtherId(),
+		ExteraPluginsId(),
+		ExteraPluginsEngineId(),
+		ExteraUpdatesId(),
+		ExteraSupportId(),
+	}, [&] {
+		PartOtherMedia(builder);
+		PartOtherSync(builder);
+		PartOther3(builder);
+		PartOther2(builder);
+		PartPlugins0(builder);
+		PartOther0(builder);
+		PartOther1(builder);
+	});
 }
 
 void BuildMain(SectionBuilder &builder) {
 	AddHeader(builder);
 	AddCategorySearch(builder, AllCategorySections(), [&] {
 		AddCategoryGrid(builder);
-		if (!style::Md3Grouped()) {
-			builder.addSkip();
-		}
-		builder.card([&] {
-			builder.addSectionButton({
-				.title = tr::lng_extera_other(),
-				.targetSection = ExteraOtherId(),
-				.icon = { &st::exteraIconOther },
-			});
-		});
 	});
 }
 
@@ -4892,9 +5265,9 @@ const auto kMainMeta = BuildHelper({
 const auto kGeneralMeta = BuildHelper({
 	.id = ExteraGeneral::Id(),
 	.parentId = ExteraMain::Id(),
-	.title = &tr::lng_exd_cat_messages,
-	.icon = &st::exteraIconChats,
-}, BuildMessages);
+	.title = &tr::lng_extera_general,
+	.icon = &st::menuIconSettings,
+}, BuildGeneral);
 
 const auto kAppearanceMeta = BuildHelper({
 	.id = ExteraAppearance::Id(),
@@ -4906,9 +5279,9 @@ const auto kAppearanceMeta = BuildHelper({
 const auto kChatsMeta = BuildHelper({
 	.id = ExteraChats::Id(),
 	.parentId = ExteraMain::Id(),
-	.title = &tr::lng_exd_cat_translate,
-	.icon = &st::exteraIconTranslate,
-}, BuildTranslate);
+	.title = &tr::lng_exd_cat_messages,
+	.icon = &st::exteraIconChats,
+}, BuildChats);
 
 const auto kPluginsMeta = BuildHelper({
 	.id = ExteraPlugins::Id(),
@@ -4933,14 +5306,14 @@ const auto kPluginsEngineMeta = BuildHelper({
 
 const auto kNavigationMeta = BuildHelper({
 	.id = ExteraNavigation::Id(),
-	.parentId = ExteraAppearance::Id(),
+	.parentId = ExteraMain::Id(),
 	.title = &tr::lng_extera_nav_title,
 	.icon = &st::menuIconReorder,
 }, BuildNavigation);
 
 const auto kAiChatMeta = BuildHelper({
 	.id = ExteraAiChat::Id(),
-	.parentId = ExteraPlugins::Id(),
+	.parentId = ExteraMain::Id(),
 	.title = &tr::lng_extera_ai_chat,
 	.icon = &st::exdMenuIconAi,
 }, BuildAiChat);
@@ -4995,9 +5368,9 @@ const auto kSupportMeta = BuildHelper({
 [[nodiscard]] rpl::producer<QString> Title(int index) {
 	switch (index) {
 	case 0: return tr::lng_extera_title();
-	case 1: return tr::lng_exd_cat_messages();
+	case 1: return tr::lng_extera_general();
 	case 2: return tr::lng_extera_appearance();
-	case 3: return tr::lng_exd_cat_translate();
+	case 3: return tr::lng_exd_cat_messages();
 	case 4: return tr::lng_exd_cat_plugins();
 	case 5: return tr::lng_extera_other();
 	case 6: return tr::lng_extera_plugins_engine_title();

@@ -7,6 +7,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "history/history_item_components.h"
 
+#include "extera/molten_chat_extras.h"
 #include "api/api_text_entities.h"
 #include "base/qt/qt_key_modifiers.h"
 #include "base/algorithm.h"
@@ -756,6 +757,7 @@ void HistoryMessageReply::itemRemoved(
 		not_null<HistoryItem*> holder,
 		not_null<HistoryItem*> removed) {
 	if (resolvedMessage.get() == removed) {
+		Extera::ChatExtras::RetainReply(holder);
 		clearData(holder);
 		holder->history()->owner().requestItemResize(holder);
 	}

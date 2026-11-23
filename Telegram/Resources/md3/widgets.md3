@@ -4,23 +4,23 @@ defaultActiveButton: RoundButton(defaultActiveButton) {
 }
 defaultPopupMenu: PopupMenu(defaultPopupMenu) {
 	scrollPadding: margins(0px, 6px, 0px, 6px);
-	radius: 14px;
+	radius: 12px;
 }
 defaultToast: Toast(defaultToast) {
-	radius: 14px;
+	radius: 8px;
 }
 defaultImportantTooltip: ImportantTooltip(defaultImportantTooltip) {
-	radius: 10px;
+	radius: 8px;
 }
 defaultSideBarButton: SideBarButton(defaultSideBarButton) {
 	textBgActive: sideBarBg;
 	badgeBgActive: sideBarBadgeBg;
 	badgeBgMutedActive: sideBarBadgeBgMuted;
 }
-menuItemBgRadius: 10px;
+menuItemBgRadius: 8px;
 menuItemBgMargins: margins(6px, 1px, 6px, 1px);
-sideBarActivePill: size(52px, 30px);
-searchFieldRowRadius: 20px;
+sideBarActivePill: size(56px, 32px);
+searchFieldRowRadius: 28px;
 defaultWindowTitle: WindowTitle(defaultWindowTitle) {
 	minimize: IconButton(windowTitleButton) {
 		icon: icon {

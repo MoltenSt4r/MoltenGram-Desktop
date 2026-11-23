@@ -24,6 +24,7 @@ bool AiChatSend(
 	not_null<Window::SessionController*> controller,
 	const QString &text);
 void ShowKeyBox(not_null<Window::SessionController*> controller);
+void ShowAiSettingsBox(not_null<Window::SessionController*> controller);
 
 [[nodiscard]] bool CanTranscribe();
 void Transcribe(

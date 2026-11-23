@@ -29,6 +29,7 @@ struct Preset {
 	QString systemVersion;
 	QString appVersion;
 	QString group;
+	QString platform;
 	bool isCustom = false;
 
 	[[nodiscard]] QString formattedSummary() const;
@@ -63,6 +64,7 @@ void SetCustomAppVersion(const QString &appVer);
 [[nodiscard]] QString ApplyDeviceModel(const QString &original = QString());
 [[nodiscard]] QString ApplySystemVersion(const QString &original = QString());
 [[nodiscard]] QString ApplyAppVersion(const QString &original = QString());
+[[nodiscard]] QString ApplyPlatform(const QString &original = QString());
 
 // Overrides all three parameters at once if spoofing is enabled
 void ApplyConnectionParameters(

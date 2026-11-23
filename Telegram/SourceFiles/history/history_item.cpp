@@ -3134,6 +3134,11 @@ void HistoryItem::clearMediaAsExpired() {
 		return;
 	}
 	unarmMediaDestroy();
+	if (Extera::SaveDeleted()) {
+		_history->owner().exteraMarkDeleted(fullId());
+		_history->owner().requestItemViewRefresh(this);
+		return;
+	}
 	auto &owner = _history->owner();
 	const auto wasServiceMessage = _isServiceMessage;
 	if (const auto document = media->document()) {
@@ -3539,7 +3544,7 @@ bool HistoryItem::forbidsSaving() const {
 	if (forbidsForward()) {
 		return true;
 	} else if (_media && _media->ttlSeconds()) {
-		return true;
+		return !Extera::SaveDeleted() && !Extera::Bool(u"ayu_bypass_protection"_q);
 	} else if (const auto invoice = _media ? _media->invoice() : nullptr) {
 		return HasExtendedMedia(*invoice);
 	}
@@ -8542,6 +8547,11 @@ void HistoryItem::applyMediaContentsRead(TimeId readDate) {
 	}
 	const auto now = base::unixtime::now();
 	if (media->ttlSecondsSingleView() || !readDate || readDate + ttl <= now) {
+		if (Extera::SaveDeleted()) {
+			_history->owner().exteraMarkDeleted(fullId());
+			_history->owner().requestItemViewRefresh(this);
+			return;
+		}
 		clearMediaAsExpired();
 	} else {
 		AddComponents(HistoryServiceSelfDestruct::Bit());

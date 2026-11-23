@@ -1015,40 +1015,60 @@ void SetPreset(Preset preset) {
 }
 
 QString PresetName(Preset preset) {
+	const auto isRu = Lang::LanguageIdOrDefault(Lang::Id()).startsWith(u"ru"_q);
 	switch (preset) {
-	case Preset::Normal: return u"Normal (Original)"_q;
-	case Preset::DeepBass: return u"Deep / Bass"_q;
-	case Preset::Helium: return u"Helium / High Pitch"_q;
-	case Preset::Robot: return u"Robot Dalek"_q;
-	case Preset::FastChipmunk: return u"Fast / Chipmunk"_q;
-	case Preset::Slow: return u"Slow Motion"_q;
-	case Preset::EchoReverb: return u"Echo / Reverb"_q;
-	case Preset::Telephone: return u"Telephone Lo-Fi"_q;
-	case Preset::Custom: return u"Custom (Manual)"_q;
+	case Preset::Normal: return isRu ? u"Обычный (без изменений)"_q : u"Normal (Original)"_q;
+	case Preset::DeepBass: return isRu ? u"Глубокий бас"_q : u"Deep / Bass"_q;
+	case Preset::Helium: return isRu ? u"Гелий (высокий тон)"_q : u"Helium / High Pitch"_q;
+	case Preset::Robot: return isRu ? u"Робот Далек"_q : u"Robot Dalek"_q;
+	case Preset::FastChipmunk: return isRu ? u"Бурундук (ускоренный)"_q : u"Fast / Chipmunk"_q;
+	case Preset::Slow: return isRu ? u"Замедленный"_q : u"Slow Motion"_q;
+	case Preset::EchoReverb: return isRu ? u"Эхо и реверберация"_q : u"Echo / Reverb"_q;
+	case Preset::Telephone: return isRu ? u"Винтажный телефон"_q : u"Telephone Lo-Fi"_q;
+	case Preset::Custom: return isRu ? u"Пользовательский (ручной)"_q : u"Custom (Manual)"_q;
 	}
-	return u"Unknown"_q;
+	return isRu ? u"Неизвестно"_q : u"Unknown"_q;
 }
 
 QString PresetDescription(Preset preset) {
+	const auto isRu = Lang::LanguageIdOrDefault(Lang::Id()).startsWith(u"ru"_q);
 	switch (preset) {
 	case Preset::Normal:
-		return u"Original natural voice without modification."_q;
+		return isRu
+			? u"Естественный исходный голос без обработки."_q
+			: u"Original natural voice without modification."_q;
 	case Preset::DeepBass:
-		return u"Deep baritone pitch with warm body and subtle acoustic delay."_q;
+		return isRu
+			? u"Глубокий баритон с тёплым тембром и лёгким акустическим эхом."_q
+			: u"Deep baritone pitch with warm body and subtle acoustic delay."_q;
 	case Preset::Helium:
-		return u"High-pitched squeaky helium balloon vocal effect."_q;
+		return isRu
+			? u"Высокий писклявый голос, как после вдоха гелия."_q
+			: u"High-pitched squeaky helium balloon vocal effect."_q;
 	case Preset::Robot:
-		return u"Metallic Dalek cyborg voice with ring modulation and comb resonance."_q;
+		return isRu
+			? u"Металлический голос киборга с кольцевой модуляцией и гребенчатым фильтром."_q
+			: u"Metallic Dalek cyborg voice with ring modulation and comb resonance."_q;
 	case Preset::FastChipmunk:
-		return u"High pitch speech accelerated by 35% for rapid chipmunk effect."_q;
+		return isRu
+			? u"Повышенный тон с ускорением на 35% для эффекта речи бурундука."_q
+			: u"High pitch speech accelerated by 35% for rapid chipmunk effect."_q;
 	case Preset::Slow:
-		return u"Deepened pitch slowed to 75% tempo for deliberate slurred speech."_q;
+		return isRu
+			? u"Пониженный тон с замедлением до 75% для тягучей речи."_q
+			: u"Deepened pitch slowed to 75% tempo for deliberate slurred speech."_q;
 	case Preset::EchoReverb:
-		return u"Spacious cathedral echo chamber with 280ms feedback delay."_q;
+		return isRu
+			? u"Объёмное соборное эхо с задержкой 280 мс и обратной связью."_q
+			: u"Spacious cathedral echo chamber with 280ms feedback delay."_q;
 	case Preset::Telephone:
-		return u"Vintage 300-3400Hz bandpass walkie-talkie and landline filter."_q;
+		return isRu
+			? u"Ретро-звук телефонного динамика (полоса 300–3400 Гц, лоу-фай 6 кГц)."_q
+			: u"Vintage 300-3400Hz bandpass walkie-talkie and landline filter."_q;
 	case Preset::Custom:
-		return u"Manually configured pitch, tempo, echo, robot and bitcrush settings."_q;
+		return isRu
+			? u"Ручная настройка высоты тона, скорости, дисторшна и модуляции."_q
+			: u"Manually configured pitch, tempo, echo, robot and bitcrush settings."_q;
 	}
 	return QString();
 }

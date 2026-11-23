@@ -28,6 +28,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/widgets/checkbox.h"
 #include "ui/widgets/fields/input_field.h"
 #include "ui/widgets/labels.h"
+#include "ui/wrap/slide_wrap.h"
 #include "ui/wrap/vertical_layout.h"
 #include "window/window_session_controller.h"
 
@@ -635,69 +636,156 @@ void Service::fetchLastFmRecent(
 	});
 }
 
+void SetupSettings(
+		not_null<Ui::VerticalLayout*> container,
+		not_null<Window::SessionController*> controller) {
+	Ui::AddSubsectionTitle(container, rpl::single(u"Now Playing & Music Status"_q));
+
+	const auto button = container->add(
+		object_ptr<Ui::SettingsButton>(
+			container,
+			rpl::single(u"Now Playing & Last.fm Broadcast"_q),
+			st::settingsButtonNoIcon));
+
+	button->setClickedCallback([=] {
+		ShowSettingsBox(controller);
+	});
+}
+
 void ShowSettingsBox(not_null<Window::SessionController*> controller) {
 	Service::Instance().init(&controller->session());
 
 	controller->show(Box([=](not_null<Ui::GenericBox*> box) {
+		box->setWidth(st::boxWideWidth);
 		box->setTitle(rpl::single(u"Now Playing & Music Status"_q));
+		box->addTopButton(st::boxTitleClose, [=] { box->closeBox(); });
 
-		// Main toggle
-		const auto enabledCheckbox = box->addRow(
+		const auto container = box->verticalLayout();
+
+		// 1. Music Broadcast Section
+		Ui::AddSubsectionTitle(container, rpl::single(u"Music Broadcast & Status"_q));
+
+		const auto enabledCheckbox = container->add(
 			object_ptr<Ui::Checkbox>(
-				box,
-				u"Broadcast Now Playing music status"_q,
-				IsEnabled()));
+				container,
+				u"Broadcast Currently Playing Music"_q,
+				IsEnabled(),
+				st::defaultCheckbox));
 
-		// Broadcast to bio
-		const auto toBioCheckbox = box->addRow(
-			object_ptr<Ui::Checkbox>(
-				box,
-				u"Broadcast track to user Bio"_q,
-				BroadcastToBioEnabled()));
-
-		// Hidden vs Visible Zero-Width
-		const auto hiddenCheckbox = box->addRow(
-			object_ptr<Ui::Checkbox>(
-				box,
-				u"Hide track inside bio with Zero-Width Codec (Invisible)"_q,
-				ZeroWidthHiddenEnabled()));
-
-		// Broadcast to Emoji Status
-		const auto toEmojiCheckbox = box->addRow(
-			object_ptr<Ui::Checkbox>(
-				box,
-				u"Broadcast track to Animated Emoji Status (🎵)"_q,
-				BroadcastToEmojiStatusEnabled()));
-
-		// Last.fm section header
-		box->addRow(
+		container->add(
 			object_ptr<Ui::FlatLabel>(
-				box,
-				u"Last.fm Scrobbler Integration"_q,
-				st::boxLabel));
+				container,
+				rpl::single(u"Automatically detect active playback from media players and display it on your profile."_q),
+				st::boxDividerLabel));
 
-		const auto lastFmUserField = box->addRow(
+		const auto broadcastWrap = container->add(
+			object_ptr<Ui::SlideWrap<Ui::VerticalLayout>>(
+				container,
+				object_ptr<Ui::VerticalLayout>(container)));
+
+		const auto broadcastOptions = broadcastWrap->entity();
+
+		Ui::AddSkip(broadcastOptions, 8);
+		const auto toBioCheckbox = broadcastOptions->add(
+			object_ptr<Ui::Checkbox>(
+				broadcastOptions,
+				u"Broadcast Track to Profile Bio"_q,
+				BroadcastToBioEnabled(),
+				st::defaultCheckbox));
+
+		broadcastOptions->add(
+			object_ptr<Ui::FlatLabel>(
+				broadcastOptions,
+				rpl::single(u"Appends the currently playing track and artist to your profile Bio."_q),
+				st::boxDividerLabel));
+
+		Ui::AddSkip(broadcastOptions, 12);
+		const auto hiddenCheckbox = broadcastOptions->add(
+			object_ptr<Ui::Checkbox>(
+				broadcastOptions,
+				u"Hide Track in Bio with Zero-Width Codec (Invisible)"_q,
+				ZeroWidthHiddenEnabled(),
+				st::defaultCheckbox));
+
+		broadcastOptions->add(
+			object_ptr<Ui::FlatLabel>(
+				broadcastOptions,
+				rpl::single(u"Encodes track info using invisible Unicode symbols. Only MoltenGram users will see it in your Bio."_q),
+				st::boxDividerLabel));
+
+		Ui::AddSkip(broadcastOptions, 12);
+		const auto toEmojiCheckbox = broadcastOptions->add(
+			object_ptr<Ui::Checkbox>(
+				broadcastOptions,
+				u"Broadcast to Animated Emoji Status (🎵)"_q,
+				BroadcastToEmojiStatusEnabled(),
+				st::defaultCheckbox));
+
+		broadcastOptions->add(
+			object_ptr<Ui::FlatLabel>(
+				broadcastOptions,
+				rpl::single(u"Sets a dynamic musical note emoji status on your profile while playing."_q),
+				st::boxDividerLabel));
+
+		broadcastWrap->toggle(IsEnabled(), anim::type::instant);
+		enabledCheckbox->checkedChanges(
+		) | rpl::on_next([=](bool checked) {
+			broadcastWrap->toggle(checked, anim::type::normal);
+		}, enabledCheckbox->lifetime());
+
+		// 2. Last.fm Integration Section
+		Ui::AddSkip(container, 16);
+		Ui::AddSubsectionTitle(container, rpl::single(u"Last.fm Scrobbler Integration"_q));
+		Ui::AddSkip(container, 8);
+
+		container->add(
+			object_ptr<Ui::FlatLabel>(
+				container,
+				rpl::single(u"Synchronize playback and scrobble tracks directly to your Last.fm account."_q),
+				st::boxDividerLabel));
+
+		Ui::AddSkip(container, 8);
+		container->add(
+			object_ptr<Ui::FlatLabel>(
+				container,
+				rpl::single(u"Last.fm Username:"_q),
+				st::defaultFlatLabel));
+
+		const auto lastFmUserField = container->add(
 			object_ptr<Ui::InputField>(
-				box,
+				container,
 				st::defaultInputField,
-				rpl::single(u"Last.fm Username"_q),
+				rpl::single(u"Enter Last.fm username"_q),
 				LastFmUsername()));
 
-		const auto lastFmKeyField = box->addRow(
+		Ui::AddSkip(container, 8);
+		container->add(
+			object_ptr<Ui::FlatLabel>(
+				container,
+				rpl::single(u"Last.fm Session Key (Optional):"_q),
+				st::defaultFlatLabel));
+
+		const auto lastFmKeyField = container->add(
 			object_ptr<Ui::InputField>(
-				box,
+				container,
 				st::defaultInputField,
-				rpl::single(u"Last.fm Session Key (Optional)"_q),
+				rpl::single(u"Enter session key or leave empty"_q),
 				LastFmSessionKey()));
 
-		// Status / Preview label
-		const auto statusLabel = box->addRow(
+		// 3. Status Section
+		Ui::AddSkip(container, 16);
+		Ui::AddSubsectionTitle(container, rpl::single(u"Current Playback Status"_q));
+		Ui::AddSkip(container, 8);
+
+		const auto statusText = Service::Instance().isBroadcasting()
+			? (u"🎵 Broadcasting: "_q + Service::Instance().currentTrack().formatted())
+			: u"⏸ Player is currently idle (no active playback)"_q;
+
+		container->add(
 			object_ptr<Ui::FlatLabel>(
-				box,
-				Service::Instance().isBroadcasting()
-					? u"Currently broadcasting: "_q + Service::Instance().currentTrack().formatted()
-					: u"Player is currently idle"_q,
-				st::boxLabel));
+				container,
+				rpl::single(statusText),
+				st::defaultFlatLabel));
 
 		// Action buttons
 		box->addButton(tr::lng_settings_save(), [=] {

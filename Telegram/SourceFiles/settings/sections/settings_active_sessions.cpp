@@ -192,9 +192,9 @@ void RenameBox(not_null<Ui::GenericBox*> box) {
 		return {};
 	};
 	const auto detectDesktop = [&]() -> std::optional<DeviceType> {
-		if (platform.contains("windows") || system.contains("windows")) {
+		if (platform.contains("windows") || system.contains("windows") || device.contains("windows") || device.startsWith("pc ")) {
 			return DeviceType::Windows;
-		} else if (platform.contains("macos") || system.contains("macos")) {
+		} else if (platform.contains("macos") || system.contains("macos") || platform.contains("os x") || system.contains("os x") || device.contains("macbook") || device.contains("mac studio") || device.contains("mac pro") || device.contains("mac mini") || device.contains("imac") || (device.contains("mac") && !device.contains("machine"))) {
 			return DeviceType::Mac;
 		} else if (platform.contains("ubuntu")
 			|| system.contains("ubuntu")
@@ -207,31 +207,59 @@ void RenameBox(not_null<Ui::GenericBox*> box) {
 		return {};
 	};
 
-	if (ranges::contains(kAndroid, apiId)) {
-		return DeviceType::Android;
-	} else if (ranges::contains(kDesktop, apiId)) {
-		return detectDesktop().value_or(DeviceType::Linux);
-	} else if (ranges::contains(kMac, apiId)) {
+	// 1. Explicit macOS / Apple Mac detection (fixes bug where selecting macOS displays green Android icon)
+	if (platform.contains("macos")
+		|| system.contains("macos")
+		|| platform.contains("os x")
+		|| system.contains("os x")
+		|| platform.contains("darwin")
+		|| system.contains("darwin")
+		|| device.contains("macbook")
+		|| device.contains("mac studio")
+		|| device.contains("mac pro")
+		|| device.contains("mac mini")
+		|| device.contains("imac")
+		|| (device.contains("mac") && !device.contains("machine"))
+		|| ranges::contains(kMac, apiId)) {
 		return DeviceType::Mac;
-	} else if (ranges::contains(kWeb, apiId)) {
-		return detectBrowser().value_or(DeviceType::Web);
-	} else if (device.contains("chromebook")) {
+	}
+
+	// 2. Explicit Apple iOS / iPadOS
+	if (device.contains("ipad")) {
+		return DeviceType::iPad;
+	} else if (device.contains("iphone") || platform.contains("ios") || system.contains("ios") || ranges::contains(kiOS, apiId)) {
+		return DeviceType::iPhone;
+	}
+
+	// 3. Browsers
+	if (device.contains("chromebook")) {
 		return DeviceType::Other;
 	} else if (const auto browser = detectBrowser()) {
 		return *browser;
-	} else if (device.contains("iphone")) {
-		return DeviceType::iPhone;
-	} else if (device.contains("ipad")) {
-		return DeviceType::iPad;
-	} else if (ranges::contains(kiOS, apiId)) {
-		return DeviceType::iPhone;
+	} else if (ranges::contains(kWeb, apiId)) {
+		return detectBrowser().value_or(DeviceType::Web);
+	}
+
+	// 4. Desktop (Windows, Ubuntu, Linux)
+	if (ranges::contains(kDesktop, apiId)) {
+		return detectDesktop().value_or(DeviceType::Linux);
 	} else if (const auto desktop = detectDesktop()) {
 		return *desktop;
-	} else if (platform.contains("android") || system.contains("android")) {
-		return DeviceType::Android;
-	} else if (platform.contains("ios") || system.contains("ios")) {
-		return DeviceType::iPhone;
 	}
+
+	// 5. Android devices (Pixel, Nothing, CMF, Galaxy, etc.)
+	if (ranges::contains(kAndroid, apiId)
+		|| platform.contains("android")
+		|| system.contains("android")
+		|| system.contains("sdk ")
+		|| device.contains("pixel")
+		|| device.contains("nothing")
+		|| device.contains("cmf")
+		|| device.contains("galaxy")
+		|| device.contains("samsung")) {
+		return DeviceType::Android;
+	}
+
 	return DeviceType::Other;
 }
 

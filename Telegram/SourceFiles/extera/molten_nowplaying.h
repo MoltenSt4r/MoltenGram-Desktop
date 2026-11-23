@@ -133,5 +133,8 @@ private:
 };
 
 void ShowSettingsBox(not_null<Window::SessionController*> controller);
+void SetupSettings(
+	not_null<Ui::VerticalLayout*> container,
+	not_null<Window::SessionController*> controller);
 
 } // namespace Extera::NowPlaying

@@ -9781,7 +9781,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_exd_streamer_preset_name" = "Preset name";
 "lng_exd_streamer_preset_applied" = "Preset {name} applied";
 "lng_exd_plugin_reloaded" = "{name} reloaded";
-"lng_exd_ws_settings" = "TG WS Proxy parameters";
+"lng_exd_ws_settings" = "WebSocket transport parameters";
 "lng_exd_ws_port" = "Port (0 for automatic)";
 "lng_exd_ws_pool" = "Connection pool per DC";
 "lng_exd_ws_buffer" = "Socket buffer, KB";
@@ -9793,7 +9793,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_exd_ws_h2" = "HTTP/2 for media";
 "lng_exd_ws_secure" = "Secure port 443 for Cloudflare";
 "lng_exd_ws_log" = "Log to tdata/tgws.log";
-"lng_exd_ws_settings_about" = "Lists are separated by commas. The proxy restarts after saving.";
+"lng_exd_ws_settings_about" = "Lists are separated by commas. The transport restarts after saving.";
 "lng_exd_right_click_incoming" = "Double right click on incoming";
 "lng_exd_right_click_outgoing" = "Double right click on outgoing";
 "lng_exd_local_premium" = "Local Telegram Premium";
@@ -9803,7 +9803,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_exd_ayu_ghost" = "Ghost mode";
 "lng_exd_ayu_ghost_read" = "Do not send read receipts";
 "lng_exd_ayu_ghost_online" = "Do not send online status";
-"lng_exd_ayu_ghost_typing" = "Do not send typing status";
+"lng_exd_ayu_ghost_typing" = "Do not send typing/recording status";
 "lng_exd_ayu_save_deleted" = "Save Deleted Messages";
 "lng_exd_ayu_about" = "Deleted messages are saved in the client data and marked as deleted.";
 "lng_exd_message_deleted" = "deleted";
@@ -9938,7 +9938,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_exd_cat_privacy" = "Privacy";
 "lng_exd_cat_privacy_about" = "Phone, ID, streamer mode";
 "lng_exd_cat_network" = "Network";
-"lng_exd_cat_network_about" = "tg-ws-proxy, downloads, speed";
+"lng_exd_cat_network_about" = "WebSocket transport, downloads, speed";
 "lng_exd_cat_plugins" = "Plugins";
 "lng_exd_cat_plugins_about" = "Plugins, engine, check";
 "lng_exd_cat_updates" = "Updates";
@@ -9947,11 +9947,11 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_exd_cat_support_about" = "Badge, donation, links";
 "lng_exd_badge_invite_support" = "Support the development too?";
 "lng_exd_badge_invite_get" = "Want a badge of your own? Support the development!";
-"lng_exd_ws_proxy_about" = "Connection to Telegram through WebSocket via the built-in tg-ws-proxy. The proxy runs locally and is configured automatically.";
+"lng_exd_ws_proxy_about" = "Connection to Telegram through WebSocket (Web client mode). The transport runs locally and is configured automatically.";
 "lng_exd_round_video_send" = "Send as Round Video";
 "lng_exd_full_members" = "Members in Groups with Hidden List";
 "lng_exd_full_members_about" = "The group profile shows administrators and message authors when the member list is hidden.";
-"lng_exd_ws_proxy" = "Use tg-ws-proxy";
+"lng_exd_ws_proxy" = "WebSocket-транспорт (режим Web-клиента)";
 "lng_exd_round_video" = "Round Video";
 "lng_exd_round_video_hint" = "Drag the circle to move the area. Use the mouse wheel to resize it.";
 "lng_exd_round_video_preparing" = "The video is being prepared for sending.";
@@ -10223,5 +10223,20 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_extera_videos" = "Videos";
 "lng_extera_auto_pause" = "Auto-Pause";
 "lng_extera_auto_pause_about" = "Pauses media playback when MoltenGram Desktop is minimized.";
+
+"lng_exd_monet_dynamic" = "Dynamic Monet Palette";
+"lng_exd_monet_color" = "Monet Accent Color";
+"lng_exd_monet_color_about" = "Choose a color from the Material You palette or create a custom accent.";
+"lng_exd_icon_packs" = "Icon Packs";
+"lng_exd_icon_packs_about" = "Icon style for menus, settings, and chats.";
+"lng_exd_icon_pack_default" = "Default (Telegram)";
+"lng_exd_icon_pack_solar" = "Solar Icon Set (@Design480)";
+"lng_exd_icon_pack_remix" = "Remix Icons (Remix-Design)";
+"lng_exd_icon_pack_material" = "Material Symbols (MD3 Rounded)";
+"lng_exd_icon_pack_halloween" = "Halloween Icon Set";
+"lng_exd_noto_emoji" = "Noto Animated Emojis";
+"lng_exd_noto_emoji_about" = "Use expressive Google Noto animated emoji set (60 fps).";
+"lng_exd_md3_progress" = "MD3 Expressive Progress Bars";
+"lng_exd_md3_progress_about" = "Rounded Material 3 progress bars with smooth spring animations.";
 
 // Keys finished

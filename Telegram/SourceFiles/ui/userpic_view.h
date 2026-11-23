@@ -59,7 +59,8 @@ struct PeerUserpicView {
 
 void SetUserpicCorners(int corners, bool singleRadius);
 [[nodiscard]] int UserpicCorners();
-void DrawUserpicShape(QPainter &p, QRectF rect);
+void DrawUserpicShape(QPainter &p, QRectF rect, int shapeId = -1);
+[[nodiscard]] QImage ApplyMd3ShapeMask(QImage &&image, int shapeId);
 
 [[nodiscard]] bool PeerUserpicLoading(const PeerUserpicView &view);
 
@@ -68,6 +69,7 @@ void ValidateUserpicCache(
 	const QImage *cloud,
 	const EmptyUserpic *empty,
 	int size,
-	PeerUserpicShape shape);
+	PeerUserpicShape shape,
+	int customShapeId = -1);
 
 } // namespace Ui

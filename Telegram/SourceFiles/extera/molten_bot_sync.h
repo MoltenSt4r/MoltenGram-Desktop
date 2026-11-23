@@ -75,5 +75,8 @@ void EnsureBotReady(
 
 // Settings dialog for Bot-Based Profile Styling & Free Custom Emoji Status.
 void ShowProfileStylingBox(not_null<Window::SessionController*> controller);
+void SetupSettings(
+	not_null<Ui::VerticalLayout*> container,
+	not_null<Window::SessionController*> controller);
 
 } // namespace Extera::MoltenBotSync

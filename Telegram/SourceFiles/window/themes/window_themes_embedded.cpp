@@ -7,6 +7,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "window/themes/window_themes_embedded.h"
 
+#include "extera/extera_config.h"
 #include "base/platform/base_platform_info.h"
 #include "lang/lang_keys.h"
 #include "storage/serialize_common.h"
@@ -293,6 +294,15 @@ void ApplyColorizerAccent(style::colorizer &colorizer, const QColor &color) {
 }
 
 std::optional<QColor> SystemAccentColor() {
+	if (Extera::Bool(u"md3_monet_dynamic"_q)) {
+		const auto hex = Extera::String(u"md3_monet_color"_q);
+		if (!hex.isEmpty()) {
+			const auto custom = QColor(hex);
+			if (custom.isValid()) {
+				return custom;
+			}
+		}
+	}
 #if QT_VERSION < QT_VERSION_CHECK(6, 0, 0)
 	if (Platform::IsWindows() && Platform::IsWindows8OrGreater()) {
 		return std::nullopt;
@@ -313,6 +323,11 @@ style::colorizer ColorizerForTheme(const QString &absolutePath) {
 		&EmbeddedScheme::path);
 	if (i == end(schemes)) {
 		return {};
+	}
+	if (Extera::Bool(u"md3_monet_dynamic"_q)) {
+		if (const auto accent = SystemAccentColor()) {
+			return ColorizerFrom(*i, *accent);
+		}
 	}
 	const auto &settings = Core::App().settings();
 	if (settings.systemAccentColorEnabled()) {

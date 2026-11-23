@@ -77,10 +77,10 @@ Name: "fr";      MessagesFile: "compiler:Languages\French.isl"
 Name: "ua";      MessagesFile: "compiler:Languages\Ukrainian.isl"
 
 [CustomMessages]
-TgWsProxy=tg-ws-proxy (connection via WebSocket)
+TgWsProxy=WebSocket transport (Web client mode)
 AyuFeatures=AyuGram features (ghost mode, deleted messages)
 Components=Components:
-ru.TgWsProxy=tg-ws-proxy (подключение через WebSocket)
+ru.TgWsProxy=WebSocket-транспорт (режим Web-клиента)
 ru.AyuFeatures=Функции AyuGram (режим призрака, удалённые сообщения)
 ru.Components=Компоненты:
 
@@ -101,7 +101,7 @@ Source: "{#ReleasePath}\python\*"; DestDir: "{app}\python"; Excludes: "tgws"; Fl
 #if DirExists(ReleasePath + "\\python\\tgws")
 Source: "{#ReleasePath}\python\tgws\*"; DestDir: "{app}\python\tgws"; Tasks: tgws; Flags: recursesubdirs createallsubdirs ignoreversion
 #endif
-#if MyBuildTarget != "winarm"
+#if (MyBuildTarget != "winarm") && FileExists(ReleasePath + "\\" + ModulesFolder + "\\d3d\\d3dcompiler_47.dll")
 Source: "{#ReleasePath}\{#ModulesFolder}\d3d\d3dcompiler_47.dll"; DestDir: "{app}\{#ModulesFolder}\d3d"; Flags: ignoreversion
 #endif
 ; NOTE: Don't use "Flags: ignoreversion" on any shared system files
@@ -125,6 +125,7 @@ Type: filesandordirs; Name: "{app}\tdata"
 Type: filesandordirs; Name: "{app}\tcache"
 Type: filesandordirs; Name: "{app}\tdumps"
 Type: filesandordirs; Name: "{app}\modules"
+Type: filesandordirs; Name: "{app}\python"
 Type: dirifempty; Name: "{app}"
 
 [Code]

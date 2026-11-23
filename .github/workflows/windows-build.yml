@@ -154,7 +154,11 @@ jobs:
           cd Telegram
           call configure.bat x64 %CREDS%
           cd ..\out
-          msbuild Telegram.slnx /t:Telegram /p:Configuration=Release /m:1 /p:CL_MPCount=2
+          if exist Telegram.slnx (
+            msbuild Telegram.slnx /t:Telegram /p:Configuration=Release /m:1 /p:CL_MPCount=2
+          ) else (
+            msbuild Telegram.sln /t:Telegram /p:Configuration=Release /m:1 /p:CL_MPCount=2
+          )
 
       - name: Package
         shell: pwsh
@@ -165,11 +169,24 @@ jobs:
           $version = $Matches[1]
           $packageVersion = $version
           if ($env:GITHUB_EVENT_NAME -eq 'release') { $packageVersion = $env:GITHUB_REF_NAME.TrimStart('v') }
+
+          # Ensure tgws is staged in release python directory
+          $tgwsSource = Join-Path $env:GITHUB_WORKSPACE 'Telegram\SourceFiles\extera\tgws'
+          $tgwsDest = Join-Path $release 'python\tgws'
+          if (Test-Path $tgwsSource) {
+            New-Item -ItemType Directory -Path $tgwsDest -Force | Out-Null
+            Copy-Item "$tgwsSource\*" $tgwsDest -Recurse -Force
+          }
+
           $portable = Join-Path $env:GITHUB_WORKSPACE 'MoltenGram-Desktop-windows-x64'
           New-Item -ItemType Directory -Path $portable -Force | Out-Null
           Copy-Item (Join-Path $release 'Telegram.exe') $portable
-          Copy-Item (Join-Path $release 'python') $portable -Recurse
-          Copy-Item (Join-Path $release 'modules') $portable -Recurse
+          if (Test-Path (Join-Path $release 'python')) {
+            Copy-Item (Join-Path $release 'python') $portable -Recurse
+          }
+          if (Test-Path (Join-Path $release 'modules')) {
+            Copy-Item (Join-Path $release 'modules') $portable -Recurse
+          }
           if (Test-Path (Join-Path $release 'Updater.exe')) { Copy-Item (Join-Path $release 'Updater.exe') $portable }
           $portableZip = "MoltenGram-Desktop-portable-x64.$packageVersion.zip"
           Compress-Archive -Path (Join-Path $portable '*') -DestinationPath (Join-Path $env:GITHUB_WORKSPACE $portableZip) -Force

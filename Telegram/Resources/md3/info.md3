@@ -1,5 +1,5 @@
 group material;
-infoProfileTopBarActionButtonRadius: 14px;
+infoProfileTopBarActionButtonRadius: 8px;
 infoProfileTopBarActionButtonFont: font(12px);
 infoMembersList: PeerList(defaultPeerList) {
 	bg: transparent;

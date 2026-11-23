@@ -1,5 +1,5 @@
 group material;
-bubbleRadiusSmall: 6px;
+bubbleRadiusSmall: 8px;
 previewMarkRead: FlatButton(previewMarkRead) {
 	exdRadius: 0px;
 }

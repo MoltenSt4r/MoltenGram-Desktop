@@ -34,6 +34,10 @@ namespace Main {
 class Session;
 } // namespace Main
 
+namespace Extera::PillStack {
+class Widget;
+} // namespace Extera::PillStack
+
 namespace HistoryView {
 class TopBarWidget;
 class ContactStatus;
@@ -360,6 +364,8 @@ private:
 	object_ptr<Ui::FadeWrapScaled<Ui::IconButton>> _jumpToDate;
 	object_ptr<Ui::CrossButton> _cancelSearch;
 	object_ptr<Ui::FadeWrapScaled<Ui::IconButton>> _lockUnlock;
+
+	object_ptr<Extera::PillStack::Widget> _pillStack = { nullptr };
 
 	std::unique_ptr<Ui::MoreChatsBar> _moreChatsBar;
 

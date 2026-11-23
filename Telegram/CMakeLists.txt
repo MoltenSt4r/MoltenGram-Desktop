@@ -2862,11 +2862,16 @@ elseif (APPLE)
                     ${icon_path}/icon_256x256.png
                     ${icon_path}/icon_512x512.png
             )
+        else()
+            add_custom_command(
+                OUTPUT Icon.icns
+                COMMAND ${CMAKE_COMMAND} -E copy
+                    ${CMAKE_CURRENT_SOURCE_DIR}/Telegram/Images.xcassets/Icon.icns
+                    Icon.icns
+            )
         endif()
-        if (ICONUTIL OR PNG2ICNS)
-            set_source_files_properties(Icon.icns PROPERTIES MACOSX_PACKAGE_LOCATION Resources)
-            target_add_resource(Telegram Icon.icns)
-        endif()
+        set_source_files_properties(Icon.icns PROPERTIES MACOSX_PACKAGE_LOCATION Resources)
+        target_add_resource(Telegram Icon.icns)
     endif()
 
     set(lang_packs
@@ -2923,9 +2928,9 @@ else()
 endif()
 
 if (build_macstore)
-    set(bundle_identifier "org.telegram.desktop")
+    set(bundle_identifier "org.moltengram.desktop")
     set(bundle_entitlements "Telegram Lite.entitlements")
-    set(output_name "Telegram Lite")
+    set(output_name "MoltenGram")
     target_link_options(Telegram
     PRIVATE
         -F${libs_loc}/breakpad/src/client/mac/build/Release
@@ -2941,12 +2946,12 @@ if (build_macstore)
     )
 else()
     if (CMAKE_GENERATOR STREQUAL Xcode)
-        set(bundle_identifier "com.tdesktop.Telegram$<$<CONFIG:Debug>:Debug>")
+        set(bundle_identifier "org.moltengram.desktop$<$<CONFIG:Debug>:Debug>")
     else()
-        set(bundle_identifier "com.tdesktop.Telegram")
+        set(bundle_identifier "org.moltengram.desktop")
     endif()
     set(bundle_entitlements "Telegram.entitlements")
-    set(output_name "Telegram")
+    set(output_name "MoltenGram")
 endif()
 
 if (CMAKE_GENERATOR STREQUAL Xcode)
@@ -3007,11 +3012,15 @@ if (WIN32)
     add_custom_command(TARGET Telegram POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E copy_directory ${libs_loc}/python311/embed $<TARGET_FILE_DIR:Telegram>/python
         COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_CURRENT_SOURCE_DIR}/SourceFiles/extera/python $<TARGET_FILE_DIR:Telegram>/python/extera
+        COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_CURRENT_SOURCE_DIR}/SourceFiles/extera/tgws $<TARGET_FILE_DIR:Telegram>/python/tgws
     )
 else()
     find_package(Python3 COMPONENTS Development REQUIRED)
     target_include_directories(Telegram PRIVATE ${Python3_INCLUDE_DIRS})
     target_link_libraries(Telegram PRIVATE ${Python3_LIBRARIES})
+    if (LINUX)
+        target_link_options(Telegram PRIVATE "-Wl,-rpath,\\$ORIGIN/lib")
+    endif()
     add_custom_command(TARGET Telegram POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_CURRENT_SOURCE_DIR}/SourceFiles/extera/python $<TARGET_FILE_DIR:Telegram>/python/extera
     )

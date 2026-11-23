@@ -162,11 +162,16 @@ void SendKeySequence(
 
 // Same name Qt uses for the native "Hide %1" / "Quit %1" items.
 [[nodiscard]] QString BundleApplicationName() {
+	const id displayName = [[NSBundle mainBundle]
+		objectForInfoDictionaryKey:@"CFBundleDisplayName"];
+	if ([displayName isKindOfClass:[NSString class]]) {
+		return QString::fromNSString(displayName);
+	}
 	const id name = [[NSBundle mainBundle]
 		objectForInfoDictionaryKey:@"CFBundleName"];
 	return [name isKindOfClass:[NSString class]]
 		? QString::fromNSString(name)
-		: u"Telegram"_q;
+		: u"MoltenGram"_q;
 }
 
 void ForceDisabled(QAction *action, bool disabled) {
@@ -426,7 +431,7 @@ void Manager::buildAppleMenu(QMenu *main) {
 			});
 		};
 		_about = main->addAction(
-			u"About Telegram"_q,
+			u"About MoltenGram"_q,
 			std::move(callback));
 		_about->setMenuRole(QAction::AboutQtRole);
 	}
@@ -660,7 +665,7 @@ void Manager::buildWindowMenu(QMenu *window) {
 	}
 	window->addSeparator();
 	_showTelegram = window->addAction(
-		u"Show Telegram"_q,
+		u"Show MoltenGram"_q,
 		receiver,
 		[this] {
 			if (const auto w = resolveActiveWindow()) {
@@ -672,7 +677,7 @@ void Manager::buildWindowMenu(QMenu *window) {
 }
 
 void Manager::buildMenu() {
-	buildAppleMenu(_menuBar->addMenu(u"Telegram"_q));
+	buildAppleMenu(_menuBar->addMenu(u"MoltenGram"_q));
 	_file = _menuBar->addMenu(u"File"_q);
 	buildFileMenu(_file);
 	_edit = _menuBar->addMenu(u"Edit"_q);

@@ -15,10 +15,13 @@ class _Balancer:
         
         self.domains = domains_list[:]
 
-        self._dc_to_domain = {
-            dc_id: random.choice(self.domains)
-            for dc_id in (1, 2, 3, 4, 5, 203)
-        }
+        if self.domains:
+            self._dc_to_domain = {
+                dc_id: random.choice(self.domains)
+                for dc_id in (1, 2, 3, 4, 5, 203)
+            }
+        else:
+            self._dc_to_domain = {}
 
     def update_domain_for_dc(self, dc_id: int, domain: str) -> bool:
         if self._dc_to_domain.get(dc_id) == domain:

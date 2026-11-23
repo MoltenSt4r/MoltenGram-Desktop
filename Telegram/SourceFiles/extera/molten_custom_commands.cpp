@@ -26,6 +26,20 @@
 namespace Extera::MoltenCommands {
 namespace {
 
+const std::vector<CustomCommand> &PresetTemplates() {
+	static const auto list = std::vector<CustomCommand>{
+		{ u"."_q, u"id"_q, u"Show current chat and user ID"_q },
+		{ u"."_q, u"tagall"_q, u"Mention chat members"_q },
+		{ u"."_q, u"ping"_q, u"Check latency to Telegram DC"_q },
+		{ u"."_q, u"shrug"_q, u"¯\\_(ツ)_/¯"_q },
+		{ u"."_q, u"tableflip"_q, u"(╯°□°)╯︵ ┻━┻"_q },
+		{ u"."_q, u"unflip"_q, u"┬─┬ノ( º _ ºノ)"_q },
+		{ u"."_q, u"lenny"_q, u"( ͡° ͜ʖ ͡°)"_q },
+		{ u"."_q, u"dis"_q, u"ಠ_ಠ"_q },
+	};
+	return list;
+}
+
 struct Store {
 	bool loaded = false;
 	std::vector<CustomCommand> commands;
@@ -51,6 +65,8 @@ void EnsureLoaded() {
 
 	auto file = QFile(StoragePath());
 	if (!file.open(QIODevice::ReadOnly)) {
+		state.commands = PresetTemplates();
+		Save();
 		return;
 	}
 	const auto doc = QJsonDocument::fromJson(file.readAll());
@@ -351,6 +367,26 @@ void ShowSettingsBox(not_null<Window::SessionController*> controller) {
 
 		box->addButton(rpl::single(u"Add command"_q), [=] {
 			ShowEditCommandBox(controller, -1, *rebuild);
+		});
+		box->addButton(rpl::single(u"Templates"_q), [=] {
+			controller->show(Box([=](not_null<Ui::GenericBox*> tmplBox) {
+				tmplBox->setTitle(rpl::single(u"Select Command Template"_q));
+				for (const auto &tmpl : PresetTemplates()) {
+					const auto text = tmpl.fullCommand() + u" — "_q + tmpl.description;
+					const auto btn = tmplBox->addRow(
+						object_ptr<Ui::SettingsButton>(
+							tmplBox,
+							rpl::single(text),
+							st::settingsButtonNoIcon));
+					btn->setClickedCallback([=] {
+						Add(tmpl);
+						tmplBox->closeBox();
+						(*rebuild)();
+						controller->showToast(u"Added template: "_q + tmpl.fullCommand());
+					});
+				}
+				tmplBox->addButton(tr::lng_cancel(), [=] { tmplBox->closeBox(); });
+			}));
 		});
 		box->addButton(tr::lng_close(), [=] { box->closeBox(); });
 	}));

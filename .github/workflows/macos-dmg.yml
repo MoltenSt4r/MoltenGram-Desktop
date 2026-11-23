@@ -13,18 +13,23 @@ permissions:
 jobs:
   dmg:
     runs-on: macos-15
+    strategy:
+      matrix:
+        arch: [arm64, x64]
     steps:
       - name: Package DMG
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAG: ${{ inputs.tag }}
+          ARCH: ${{ matrix.arch }}
         run: |
           VERSION="${TAG#v}"
           gh release download "$TAG" --repo "$GITHUB_REPOSITORY" \
-            --pattern "MoltenGram-Desktop-macos-arm64.$VERSION.zip"
-          ditto -x -k "MoltenGram-Desktop-macos-arm64.$VERSION.zip" dmg
-          ln -s /Applications dmg/Applications
-          hdiutil create -volname "MoltenGram Desktop" -srcfolder dmg -ov -format UDZO \
-            "MoltenGram-Desktop-macos-arm64.$VERSION.dmg"
+            --pattern "MoltenGram-Desktop-macos-$ARCH.$VERSION.zip"
+          mkdir -p "dmg_$ARCH"
+          ditto -x -k "MoltenGram-Desktop-macos-$ARCH.$VERSION.zip" "dmg_$ARCH"
+          ln -s /Applications "dmg_$ARCH/Applications"
+          hdiutil create -volname "MoltenGram Desktop" -srcfolder "dmg_$ARCH" -ov -format UDZO \
+            "MoltenGram-Desktop-macos-$ARCH.$VERSION.dmg"
           gh release upload "$TAG" --repo "$GITHUB_REPOSITORY" \
-            "MoltenGram-Desktop-macos-arm64.$VERSION.dmg" --clobber
+            "MoltenGram-Desktop-macos-$ARCH.$VERSION.dmg" --clobber

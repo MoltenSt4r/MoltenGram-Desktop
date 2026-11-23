@@ -678,7 +678,7 @@ public:
 	, _options(options)
 	, _matrix(GenerateMatrix(link)) {
 		setMouseTracking(true);
-		resize(340, 440);
+		resize(sizeHint());
 	}
 
 	void setDotStyle(DotStyle style) {
@@ -694,9 +694,9 @@ public:
 protected:
 	void paintEvent(QPaintEvent *e) override {
 		QPainter p(this);
-		PaintCard(p, rect(), _matrix, _options);
+		PaintCard(p, QRect(0, 0, width(), _options.cardHeight + 16), _matrix, _options);
 
-		// Draw style switch chips near the bottom
+		// Draw style switch chips in a dedicated section below the card
 		paintStyleChips(p);
 	}
 
@@ -713,11 +713,11 @@ protected:
 	}
 
 	QSize sizeHint() const override {
-		return QSize(340, 440);
+		return QSize(360, _options.cardHeight + 16 + 54);
 	}
 
 	QSize minimumSizeHint() const override {
-		return QSize(300, 410);
+		return QSize(320, _options.cardHeight + 16 + 54);
 	}
 
 private:
@@ -725,31 +725,38 @@ private:
 		PainterHighQualityEnabler hq(p);
 		const auto &styles = AvailableDotStyles();
 		const auto count = static_cast<int>(styles.size());
-		const int chipHeight = 24;
-		const int chipY = height() - chipHeight - 16;
-		const int totalW = width() - 32;
-		const int chipW = std::clamp(totalW / count - 4, 38, 56);
-		const int startX = (width() - (count * chipW + (count - 1) * 4)) / 2;
+		const int chipHeight = 32;
+		const int chipY = _options.cardHeight + 16 + 8;
+		const int totalW = std::min(width() - 24, 340);
+		const int gap = 6;
+		const int chipW = std::max(42, (totalW - (count - 1) * gap) / count);
+		const int actualTotalW = count * chipW + (count - 1) * gap;
+		const int startX = (width() - actualTotalW) / 2;
 
 		auto font = p.font();
-		font.setPixelSize(10);
+		font.setPixelSize(11);
 		font.setBold(true);
 		p.setFont(font);
 
+		const auto isDark = (st::windowBg->c.lightness() < 128);
+
 		for (int i = 0; i < count; ++i) {
-			const auto rect = QRect(startX + i * (chipW + 4), chipY, chipW, chipHeight);
+			const auto rect = QRect(startX + i * (chipW + gap), chipY, chipW, chipHeight);
 			const bool active = (styles[i] == _options.dotStyle);
 
 			if (active) {
 				p.setPen(Qt::NoPen);
 				p.setBrush(_options.accentColor);
-				p.drawRoundedRect(rect, 12, 12);
+				p.drawRoundedRect(rect, 16, 16);
 				p.setPen(Qt::white);
 			} else {
-				p.setPen(QPen(QColor(0xDC, 0xDC, 0xE2), 1.0));
-				p.setBrush(QColor(0xF4, 0xF4, 0xF8));
-				p.drawRoundedRect(rect, 12, 12);
-				p.setPen(QColor(0x4E, 0x4E, 0x56));
+				const auto chipBg = isDark ? QColor(255, 255, 255, 18) : QColor(0, 0, 0, 10);
+				const auto chipBorder = isDark ? QColor(255, 255, 255, 36) : QColor(0, 0, 0, 24);
+				const auto chipFg = isDark ? QColor(220, 220, 228) : QColor(0x4E, 0x4E, 0x56);
+				p.setPen(QPen(chipBorder, 1.0));
+				p.setBrush(chipBg);
+				p.drawRoundedRect(rect, 16, 16);
+				p.setPen(chipFg);
 			}
 
 			const auto name = DotStyleName(styles[i]);
@@ -760,14 +767,19 @@ private:
 	[[nodiscard]] int chipAt(QPoint pos) const {
 		const auto &styles = AvailableDotStyles();
 		const auto count = static_cast<int>(styles.size());
-		const int chipHeight = 24;
-		const int chipY = height() - chipHeight - 16;
-		const int totalW = width() - 32;
-		const int chipW = std::clamp(totalW / count - 4, 38, 56);
-		const int startX = (width() - (count * chipW + (count - 1) * 4)) / 2;
+		const int chipHeight = 32;
+		const int chipY = _options.cardHeight + 16 + 8;
+		const int totalW = std::min(width() - 24, 340);
+		const int gap = 6;
+		const int chipW = std::max(42, (totalW - (count - 1) * gap) / count);
+		const int actualTotalW = count * chipW + (count - 1) * gap;
+		const int startX = (width() - actualTotalW) / 2;
 
+		if (pos.y() < chipY || pos.y() > chipY + chipHeight) {
+			return -1;
+		}
 		for (int i = 0; i < count; ++i) {
-			const auto rect = QRect(startX + i * (chipW + 4), chipY, chipW, chipHeight);
+			const auto rect = QRect(startX + i * (chipW + gap), chipY, chipW, chipHeight);
 			if (rect.contains(pos)) {
 				return i;
 			}
@@ -1037,8 +1049,14 @@ void PaintCard(
 		return;
 	}
 
-	// Card bounds
-	const auto cardRect = targetRect.adjusted(12, 10, -12, -44);
+	// Card bounds centered horizontally in targetRect
+	const int cardW = std::clamp(targetRect.width() - 24, 260, options.cardWidth);
+	const int cardH = std::min(targetRect.height() - 16, options.cardHeight);
+	const auto cardRect = QRect(
+		targetRect.x() + (targetRect.width() - cardW) / 2,
+		targetRect.y() + 8,
+		cardW,
+		cardH);
 
 	// Soft MD3 Elevation Shadows
 	if (options.drawShadow) {
@@ -1120,14 +1138,14 @@ void SetCurrentDotStyle(DotStyle style) {
 
 QString DotStyleName(DotStyle style) {
 	switch (style) {
-	case DotStyle::Squircles: return u"Squircles"_q;
+	case DotStyle::Squircles: return u"Squircle"_q;
 	case DotStyle::Dots: return u"Dots"_q;
 	case DotStyle::RoundedSquares: return u"Rounded"_q;
 	case DotStyle::Squares: return u"Square"_q;
 	case DotStyle::Diamond: return u"Diamond"_q;
 	case DotStyle::Md3Shapes: return u"MD3"_q;
 	}
-	return u"Squircles"_q;
+	return u"Squircle"_q;
 }
 
 const std::vector<DotStyle> &AvailableDotStyles() {
@@ -1153,32 +1171,26 @@ void ShowQrShareBox(
 		: link.trimmed();
 
 	controller->show(Box([=](not_null<Ui::GenericBox*> box) {
+		box->setWidth(st::boxWideWidth);
 		box->setTitle(rpl::single(title.isEmpty()
 			? u"Share QR Code"_q
 			: title));
+		box->addTopButton(st::boxTitleClose, [=] { box->closeBox(); });
 
 		auto options = RenderOptions();
 		options.title = u"MoltenGram"_q;
 		options.subtitle = u"Scan to connect on MoltenGram"_q;
 		options.dotStyle = CurrentDotStyle();
+		options.cardWidth = 320;
+		options.cardHeight = 330;
+		options.qrSize = 210;
 
 		const auto cardWidget = box->addRow(
-			object_ptr<QrCardWidget>(box, effectiveLink, options));
+			object_ptr<QrCardWidget>(box, effectiveLink, options),
+			QMargins(0, 8, 0, 16));
 
-		box->addButton(rpl::single(u"Copy Link"_q), [=] {
-			QGuiApplication::clipboard()->setText(effectiveLink);
-			controller->showToast(u"Link copied to clipboard"_q);
-		});
-
-		box->addButton(rpl::single(u"Copy Image"_q), [=] {
-			const auto img = RenderCard(effectiveLink, cardWidget->currentOptions());
-			auto mime = std::make_unique<QMimeData>();
-			mime->setImageData(img);
-			QGuiApplication::clipboard()->setMimeData(mime.release());
-			controller->showToast(u"QR Code copied to clipboard"_q);
-		});
-
-		box->addLeftButton(rpl::single(u"Save PNG"_q), [=] {
+		// Dedicated footer with clean layout: 'PNG' on left, 'Copy Image' & 'Close' on right
+		box->addLeftButton(rpl::single(u"PNG"_q), [=] {
 			const auto path = QFileDialog::getSaveFileName(
 				box,
 				u"Save MoltenGram QR Code"_q,
@@ -1190,6 +1202,14 @@ void ShowQrShareBox(
 					controller->showToast(u"QR Code saved successfully"_q);
 				}
 			}
+		});
+
+		box->addButton(rpl::single(u"Copy Image"_q), [=] {
+			const auto img = RenderCard(effectiveLink, cardWidget->currentOptions());
+			auto mime = std::make_unique<QMimeData>();
+			mime->setImageData(img);
+			QGuiApplication::clipboard()->setMimeData(mime.release());
+			controller->showToast(u"QR Code copied to clipboard"_q);
 		});
 
 		box->addButton(tr::lng_close(), [=] {

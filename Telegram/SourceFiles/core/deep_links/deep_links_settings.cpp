@@ -7,6 +7,9 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "core/deep_links/deep_links_router.h"
 
+#include "extera/molten_device_spoof.h"
+#include "extera/molten_voice_changer.h"
+
 #include "apiwrap.h"
 #include "base/binary_guard.h"
 #include "boxes/add_contact_box.h"
@@ -543,6 +546,76 @@ void RegisterSettingsHandlers(Router &router) {
 			router.add(u"settings"_q, {
 				.path = prefix + suffix,
 				.action = SettingsSection{ id },
+			});
+		}
+	}
+
+	const auto showDeviceSpoof = [](const Context &ctx) {
+		if (!ctx.controller) {
+			return Result::NeedsAuth;
+		}
+		Extera::DeviceSpoof::ShowSettingsBox(ctx.controller);
+		return Result::Handled;
+	};
+
+	const auto showVoiceChanger = [](const Context &ctx) {
+		if (!ctx.controller) {
+			return Result::NeedsAuth;
+		}
+		Extera::VoiceChanger::ShowSettingsBox(ctx.controller);
+		return Result::Handled;
+	};
+
+	const auto moltenRoutes = std::vector<std::pair<QString, Action>>{
+		{ QString(), SettingsSection{ ::Settings::ExteraId() } },
+		{ u"settings"_q, SettingsSection{ ::Settings::ExteraId() } },
+		{ u"general"_q, SettingsSection{ ::Settings::ExteraGeneralId() } },
+		{ u"appearance"_q, SettingsSection{ ::Settings::ExteraAppearanceId() } },
+		{ u"chats"_q, SettingsSection{ ::Settings::ExteraChatsId() } },
+		{ u"plugins"_q, SettingsSection{ ::Settings::ExteraPluginsId() } },
+		{ u"plugins/engine"_q, SettingsSection{ ::Settings::ExteraPluginsEngineId() } },
+		{ u"navigation"_q, SettingsSection{ ::Settings::ExteraNavigationId() } },
+		{ u"aichat"_q, SettingsSection{ ::Settings::ExteraAiChatId() } },
+		{ u"ai"_q, SettingsSection{ ::Settings::ExteraAiChatId() } },
+		{ u"ai_settings"_q, SettingsSection{ ::Settings::ExteraAiChatId() } },
+		{ u"other"_q, SettingsSection{ ::Settings::ExteraOtherId() } },
+		{ u"privacy"_q, SettingsSection{ ::Settings::ExteraPrivacyId() } },
+		{ u"network"_q, SettingsSection{ ::Settings::ExteraNetworkId() } },
+		{ u"updates"_q, SettingsSection{ ::Settings::ExteraUpdatesId() } },
+		{ u"update"_q, SettingsSection{ ::Settings::ExteraUpdatesId() } },
+		{ u"support"_q, SettingsSection{ ::Settings::ExteraSupportId() } },
+		{ u"donate"_q, SettingsSection{ ::Settings::ExteraSupportId() } },
+		{ u"devices"_q, SettingsSection{ ::Settings::SessionsId() } },
+		{ u"sessions"_q, SettingsSection{ ::Settings::SessionsId() } },
+		{ u"device_spoof"_q, CodeBlock{ showDeviceSpoof } },
+		{ u"devicespoof"_q, CodeBlock{ showDeviceSpoof } },
+		{ u"device_spoofing"_q, CodeBlock{ showDeviceSpoof } },
+		{ u"devicespoofing"_q, CodeBlock{ showDeviceSpoof } },
+		{ u"spoof"_q, CodeBlock{ showDeviceSpoof } },
+		{ u"voice_changer"_q, CodeBlock{ showVoiceChanger } },
+		{ u"voicechanger"_q, CodeBlock{ showVoiceChanger } },
+		{ u"voice"_q, CodeBlock{ showVoiceChanger } },
+		{ u"avatar_shapes"_q, SettingsSection{ ::Settings::ExteraAppearanceId() } },
+		{ u"md3_avatar_shapes"_q, SettingsSection{ ::Settings::ExteraAppearanceId() } },
+		{ u"pillstack"_q, SettingsSection{ ::Settings::ExteraNavigationId() } },
+		{ u"liquid_glass"_q, SettingsSection{ ::Settings::ExteraAppearanceId() } },
+		{ u"liquidglass"_q, SettingsSection{ ::Settings::ExteraAppearanceId() } },
+		{ u"glass"_q, SettingsSection{ ::Settings::ExteraAppearanceId() } },
+		{ u"tools"_q, SettingsSection{ ::Settings::ExteraOtherId() } },
+		{ u"moltengram_tools"_q, SettingsSection{ ::Settings::ExteraOtherId() } },
+		{ u"exteraless_tools"_q, SettingsSection{ ::Settings::ExteraOtherId() } },
+		{ u"cloud"_q, SettingsSection{ ::Settings::ExteraOtherId() } },
+	};
+
+	for (const auto &host : { u"moltengram"_q, u"molten"_q }) {
+		for (const auto &[path, action] : moltenRoutes) {
+			router.add(host, {
+				.path = path,
+				.action = action,
+			});
+			router.add(u"settings"_q, {
+				.path = host + (path.isEmpty() ? QString() : (u"/"_q + path)),
+				.action = action,
 			});
 		}
 	}

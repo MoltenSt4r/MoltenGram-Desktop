@@ -14,6 +14,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "extera/exd_update_box.h"
 
 #include "extera/extera_config.h"
+#include "extera/molten_pillstack.h"
 
 #include "base/call_delayed.h"
 #include "base/qt/qt_key_modifiers.h"
@@ -266,6 +267,7 @@ Widget::Widget(
 , _lockUnlock(
 	_searchControls,
 	object_ptr<Ui::IconButton>(this, st::dialogsLock))
+, _pillStack(this, controller)
 , _chatsFilterForTopBarSuggestion(controller->activeChatsFilterCurrent())
 , _scroll(this)
 , _scrollToTop(_scroll, st::dialogsToUp)
@@ -1868,6 +1870,14 @@ void Widget::updateControlsVisibility(bool fast) {
 	}
 	_searchControls->setVisible(
 		!_openedFolder && !_openedForum && !_openedCommunity);
+	if (_pillStack) {
+		const auto showPills = Extera::PillStack::Enabled()
+			&& !_openedFolder
+			&& !_openedForum
+			&& !_openedCommunity
+			&& (_layout != Layout::Child);
+		_pillStack->setVisible(showPills);
+	}
 	if (_moreChatsBar) {
 		_moreChatsBar->show();
 	}
@@ -2918,6 +2928,9 @@ void Widget::startSlideAnimation(
 		_stories->setToggledHidden(true, false);
 	}
 	_searchControls->hide();
+	if (_pillStack) {
+		_pillStack->hide();
+	}
 	if (_subsectionTopBar) {
 		_subsectionTopBar->hide();
 	}
@@ -4613,6 +4626,10 @@ void Widget::updateControlsGeometry() {
 		? ((smallw - ratiow) / float64(smallw - _narrowWidth))
 		: 0.;
 
+	if (_pillStack && (narrowRatio > 0.5 || ratiow < smallw)) {
+		_pillStack->hide();
+	}
+
 	auto filterLeft = (controller()->filtersWidth()
 		? st::dialogsFilterSkip
 		: (st::dialogsFilterPadding.x() + _mainMenu.toggle->width()))
@@ -4757,8 +4774,15 @@ void Widget::updateControlsGeometry() {
 		_frozenAccountBar->resize(barw, _frozenAccountBar->height());
 	}
 	_updateScrollGeometryCached = [=] {
-		const auto frozenBarTop = expandedStoriesTop
+		const auto pillStackHeight = (_pillStack && _pillStack->isVisible())
+			? style::ConvertScale(32)
+			: 0;
+		const auto pillStackTop = expandedStoriesTop
 			+ ((!_stories || _stories->isHidden()) ? 0 : _aboveScrollAdded);
+		if (_pillStack) {
+			_pillStack->setGeometry(0, pillStackTop, barw, pillStackHeight);
+		}
+		const auto frozenBarTop = pillStackTop + pillStackHeight;
 		if (_frozenAccountBar) {
 			_frozenAccountBar->move(0, frozenBarTop);
 		}

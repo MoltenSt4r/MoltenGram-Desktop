@@ -12,6 +12,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "core/application.h"
 #include "core/changelogs.h"
 #include "core/core_settings.h"
+#include "extera/molten_device_spoof.h"
 #include "lang/lang_keys.h"
 #include "main/main_app_config.h"
 #include "main/main_session_settings.h"
@@ -38,7 +39,7 @@ Authorizations::Entry ParseEntry(const MTPDauthorization &data) {
 		|| isTest;
 
 	const auto appName = isDesktop
-		? u"Telegram Desktop%1"_q.arg(isTest ? " (GitHub)" : QString())
+		? u"MoltenGram Desktop%1"_q.arg(isTest ? " (GitHub)" : QString())
 		: qs(data.vapp_name());// + u" for "_q + qs(d.vplatform());
 	const auto appVer = [&] {
 		const auto version = qs(data.vapp_version());
@@ -66,14 +67,23 @@ Authorizations::Entry ParseEntry(const MTPDauthorization &data) {
 	//if (j != countries.cend()) {
 	//	country = QString::fromUtf8(j.value()->name);
 	//}
-	result.system = qs(data.vsystem_version());
-	result.platform = qs(data.vplatform());
+	result.system = result.hash
+		? qs(data.vsystem_version())
+		: Extera::DeviceSpoof::ApplySystemVersion(qs(data.vsystem_version()));
+	result.platform = result.hash
+		? qs(data.vplatform())
+		: Extera::DeviceSpoof::ApplyPlatform(qs(data.vplatform()));
 	result.activeTime = data.vdate_active().v
 		? data.vdate_active().v
 		: data.vdate_created().v;
-	result.info = QString("%1%2").arg(
-		appName,
-		appVer.isEmpty() ? QString() : (' ' + appVer));
+	if (!result.hash && Extera::DeviceSpoof::Enabled()) {
+		const auto spoofApp = Extera::DeviceSpoof::ApplyAppVersion(qs(data.vapp_version()));
+		result.info = spoofApp.isEmpty() ? appName : spoofApp;
+	} else {
+		result.info = QString("%1%2").arg(
+			appName,
+			appVer.isEmpty() ? QString() : (' ' + appVer));
+	}
 	result.ip = qs(data.vip());
 	result.active = result.hash
 		? Authorizations::ActiveDateString(result.activeTime)

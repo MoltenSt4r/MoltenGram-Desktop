@@ -129,12 +129,12 @@ exteraIconExport: icon {{ "extera/settings", menuIconColor }};
 exteraIconImport: icon {{ "extera/archive", menuIconColor }};
 exteraIconReset: icon {{ "extera/reset", menuIconColor }};
 exteraIconDeveloper: icon {{ "menu/profile", menuIconColor }};
-exteraCardMargin: margins(12px, 0px, 12px, 0px);
+exteraCardMargin: margins(16px, 0px, 16px, 0px);
 exteraCardPadding: margins(0px, 8px, 0px, 8px);
-exteraCardRadius: 10px;
-exteraCardGap: 12px;
-exteraTitleAddPadding: margins(12px, 6px, 0px, 0px);
-exteraAboutPadding: margins(34px, 8px, 34px, 6px);
+exteraCardRadius: 16px;
+exteraCardGap: 16px;
+exteraTitleAddPadding: margins(16px, 8px, 0px, 0px);
+exteraAboutPadding: margins(32px, 8px, 32px, 8px);
 exteraAbout: FlatLabel(defaultFlatLabel) {
 	minWidth: 64px;
 	textFg: windowSubTextFg;
@@ -191,21 +191,21 @@ exteraFeedMediaRadius: 12px;
 exteraPluginIcon: 42px;
 exteraPluginIconSkip: 14px;
 exteraHeaderLogoSize: 72px;
-exteraHeaderLogoPadding: margins(0px, 12px, 0px, 0px);
+exteraHeaderLogoPadding: margins(0px, 16px, 0px, 0px);
 exteraHeaderTitle: FlatLabel(defaultFlatLabel) {
 	style: TextStyle(defaultTextStyle) {
 		font: font(20px semibold);
 	}
 	textFg: windowBoldFg;
 }
-exteraHeaderTitlePadding: margins(0px, 10px, 0px, 0px);
+exteraHeaderTitlePadding: margins(0px, 8px, 0px, 0px);
 exteraHeaderVersion: FlatLabel(defaultFlatLabel) {
 	style: TextStyle(defaultTextStyle) {
 		font: font(14px);
 	}
 	textFg: windowSubTextFg;
 }
-exteraHeaderVersionPadding: margins(0px, 2px, 0px, 6px);
+exteraHeaderVersionPadding: margins(0px, 4px, 0px, 8px);
 
 settingsPremiumIconDouble: icon {{ "settings/premium/double", settingsIconFg }};
 settingsPremiumIconTags: icon {{ "settings/premium/tags", settingsIconFg }};
@@ -1226,15 +1226,15 @@ exteraPlayerBox: Box(defaultBox) {
 	buttonPadding: margins(0px, 0px, 0px, 0px);
 	buttonHeight: 0px;
 }
-exteraCategoryGridPadding: margins(14px, 10px, 14px, 6px);
+exteraCategoryGridPadding: margins(16px, 8px, 16px, 8px);
 exteraCategoryCardHeight: 72px;
 exteraCategoryCardSkip: 8px;
-exteraCategoryCardRadius: 12px;
-exteraCategoryCardPadding: 14px;
-exteraCategoryTileSize: 38px;
-exteraCategoryTileRadius: 10px;
+exteraCategoryCardRadius: 16px;
+exteraCategoryCardPadding: 16px;
+exteraCategoryTileSize: 40px;
+exteraCategoryTileRadius: 12px;
 exteraCategoryTitleSkip: 12px;
-exteraCategoryAboutSkip: 2px;
+exteraCategoryAboutSkip: 4px;
 exteraCategoryAboutFont: font(12px);
 
 exteraWelcomeLogoSize: 96px;

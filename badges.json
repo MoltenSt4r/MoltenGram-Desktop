@@ -41,7 +41,7 @@
     {
       "id": 8406822449,
       "type": "donor",
-      "text": "Пользователь поддержал разработку exDesktop самым первым, большое спасибо <3"
+      "text": "Пользователь поддержал разработку MoltenGram Desktop самым первым, большое спасибо <3"
     },
     {
       "id": 1876746076,
@@ -203,8 +203,8 @@
     },
     {
       "id": 3914431400,
-      "username": "exDesktopPlugins",
-      "name": "exDesktop Plugins"
+      "username": "MoltenGramPlugins",
+      "name": "MoltenGram Plugins"
     }
   ]
 }

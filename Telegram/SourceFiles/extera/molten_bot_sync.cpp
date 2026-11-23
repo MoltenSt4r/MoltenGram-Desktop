@@ -21,6 +21,8 @@
 #include "ui/painter.h"
 #include "ui/widgets/buttons.h"
 #include "ui/widgets/labels.h"
+#include "ui/wrap/slide_wrap.h"
+#include "ui/wrap/vertical_layout.h"
 #include "window/window_session_controller.h"
 
 #include <QtCore/QDateTime>
@@ -725,33 +727,34 @@ constexpr auto kSwatchColors = std::array<QColor, 8>{
 };
 
 not_null<Ui::RpWidget*> AddColorSwatchRow(
-		not_null<Ui::GenericBox*> box,
+		not_null<Ui::VerticalLayout*> container,
 		int count,
 		int initialIndex,
 		Fn<void(int)> onSelect) {
-	const auto row = box->addRow(
-		object_ptr<Ui::RpWidget>(box),
-		st::boxRowPadding + QMargins(0, st::boxLittleSkip, 0, st::boxLittleSkip));
+	const auto row = container->add(
+		object_ptr<Ui::RpWidget>(container));
 	const auto selected = row->lifetime().make_state<int>(initialIndex);
-	const auto swatchSize = 28;
+	const auto swatchSize = 32;
 	const auto gap = 8;
-	row->resize(row->width(), swatchSize + 8);
+	row->resize(container->width(), swatchSize + 12);
 	row->setCursor(style::cur_pointer);
 
 	row->paintRequest() | rpl::on_next([=] {
 		auto p = QPainter(row);
 		PainterHighQualityEnabler hq(p);
-		const auto y = 4;
+		const auto totalWidth = (count + 1) * swatchSize + count * gap;
+		const auto startX = std::max(4, (row->width() - totalWidth) / 2);
+		const auto y = 6;
 		// Index -1 = Default/Clear button at position 0.
 		for (int i = -1; i < count; ++i) {
 			const auto slot = i + 1;
-			const auto x = slot * (swatchSize + gap);
+			const auto x = startX + slot * (swatchSize + gap);
 			const auto rect = QRect(x, y, swatchSize, swatchSize);
 			if (i < 0) {
-				p.setPen(QPen(st::windowSubTextFg->c, 1.5));
+				p.setPen(QPen(st::windowSubTextFg->c, 1.8));
 				p.setBrush(Qt::NoBrush);
 				p.drawEllipse(rect.adjusted(2, 2, -2, -2));
-				p.drawLine(rect.topLeft() + QPoint(7, 7), rect.bottomRight() - QPoint(7, 7));
+				p.drawLine(rect.topLeft() + QPoint(8, 8), rect.bottomRight() - QPoint(8, 8));
 			} else {
 				const auto &color = kSwatchColors[size_t(i) % kSwatchColors.size()];
 				p.setPen(Qt::NoPen);
@@ -761,7 +764,7 @@ not_null<Ui::RpWidget*> AddColorSwatchRow(
 			if (*selected == i) {
 				p.setPen(QPen(st::windowBgActive->c, 2.5));
 				p.setBrush(Qt::NoBrush);
-				p.drawEllipse(rect.adjusted(0, 0, 0, 0));
+				p.drawEllipse(rect.adjusted(-2, -2, 2, 2));
 			}
 		}
 	}, row->lifetime());
@@ -771,12 +774,17 @@ not_null<Ui::RpWidget*> AddColorSwatchRow(
 			return;
 		}
 		const auto me = static_cast<QMouseEvent*>(e.get());
-		const auto slot = int(me->pos().x()) / (swatchSize + gap);
-		const auto idx = slot - 1;
-		if (idx >= -1 && idx < count) {
-			*selected = idx;
-			row->update();
-			onSelect(idx);
+		const auto totalWidth = (count + 1) * swatchSize + count * gap;
+		const auto startX = std::max(4, (row->width() - totalWidth) / 2);
+		const auto relX = int(me->pos().x()) - startX;
+		if (relX >= 0) {
+			const auto slot = relX / (swatchSize + gap);
+			const auto idx = slot - 1;
+			if (idx >= -1 && idx < count) {
+				*selected = idx;
+				row->update();
+				onSelect(idx);
+			}
 		}
 	}, row->lifetime());
 
@@ -1099,8 +1107,11 @@ void ShowProfileStylingBox(not_null<Window::SessionController*> controller) {
 		const auto self = session->user();
 		const auto ownerId = peerToUser(self->id).bare;
 
-		box->setTitle(rpl::single(u"MoltenGram Profile Styling"_q));
 		box->setWidth(st::boxWideWidth);
+		box->setTitle(rpl::single(u"Profile Styling & Custom Emoji Status"_q));
+		box->addTopButton(st::boxTitleClose, [=] { box->closeBox(); });
+
+		const auto container = box->verticalLayout();
 
 		struct State {
 			MoltenProfile::Metadata meta;
@@ -1110,22 +1121,30 @@ void ShowProfileStylingBox(not_null<Window::SessionController*> controller) {
 		const auto state = box->lifetime().make_state<State>();
 		state->meta = MoltenProfile::GetSelfMetadataSnapshot(self);
 
-		// 1. Companion Bot Sync status / setup button
+		// 1. Companion Bot Sync Section
+		Ui::AddSubsectionTitle(container, rpl::single(u"Companion Sync Bot"_q));
+		container->add(
+			object_ptr<Ui::FlatLabel>(
+				container,
+				rpl::single(u"Synchronizes your custom appearance and emoji status across devices via @BotFather."_q),
+				st::boxDividerLabel));
+
+		Ui::AddSkip(container, 8);
+
 		const auto botStatusText = [=] {
 			const auto botUser = GetSavedSelfBotUsername(ownerId);
 			if (MoltenProfile::BotProfileSyncEnabled() && !botUser.isEmpty()) {
-				return u"Companion Bot: @"_q + botUser + u" (Synced)"_q;
+				return u"Companion Bot: @"_q + botUser + u" (Active & Synced)"_q;
 			}
-			return u"Set up Companion Bot Sync (@BotFather)"_q;
+			return u"Set up Sync Bot via @BotFather"_q;
 		};
 		const auto botButtonText = box->lifetime().make_state<rpl::variable<QString>>(
 			botStatusText());
-		const auto botButton = box->addRow(
+		const auto botButton = container->add(
 			object_ptr<Ui::SettingsButton>(
-				box,
+				container,
 				botButtonText->value(),
-				st::settingsButtonNoIcon),
-			style::margins());
+				st::settingsButtonNoIcon));
 		botButton->setClickedCallback([=] {
 			controller->showToast(u"Setting up MoltenGram Sync bot via @BotFather..."_q);
 			EnsureBotReady(session, true, crl::guard(box, [=](BotSetupResult res) {
@@ -1142,12 +1161,22 @@ void ShowProfileStylingBox(not_null<Window::SessionController*> controller) {
 		});
 
 		// 2. Free Custom Emoji Status picker
-		const auto statusButton = box->addRow(
+		Ui::AddSkip(container, 16);
+		Ui::AddSubsectionTitle(container, rpl::single(u"Free Custom Emoji Status"_q));
+		container->add(
+			object_ptr<Ui::FlatLabel>(
+				container,
+				rpl::single(u"Set an animated emoji status next to your name without Telegram Premium."_q),
+				st::boxDividerLabel));
+
+		Ui::AddSkip(container, 8);
+
+		const auto statusButton = container->add(
 			object_ptr<Ui::SettingsButton>(
-				box,
-				rpl::single(u"Custom Emoji Status (Free)"_q),
-				st::settingsButtonNoIcon),
-			style::margins());
+				container,
+				rpl::single(u"Choose Custom Emoji Status..."_q),
+				st::settingsButtonNoIcon));
+
 		const auto preview = Ui::CreateChild<Ui::RpWidget>(statusButton);
 		const auto previewSize = Data::FrameSizeFromTag(
 			Data::CustomEmojiManager::SizeTag::Large
@@ -1199,12 +1228,12 @@ void ShowProfileStylingBox(not_null<Window::SessionController*> controller) {
 			refreshStatusPreview();
 		}, box->lifetime());
 
-		const auto clearStatusBtn = box->addRow(
+		Ui::AddSkip(container, 8);
+		const auto clearStatusBtn = container->add(
 			object_ptr<Ui::SettingsButton>(
-				box,
-				rpl::single(u"Clear Custom Emoji Status"_q),
-				st::settingsButtonNoIcon),
-			style::margins());
+				container,
+				rpl::single(u"Reset Emoji Status to None"_q),
+				st::settingsButtonNoIcon));
 		clearStatusBtn->setClickedCallback([=] {
 			state->meta.emojiStatusDocId = 0;
 			state->meta.emojiStatusCollectible = false;
@@ -1212,33 +1241,39 @@ void ShowProfileStylingBox(not_null<Window::SessionController*> controller) {
 		});
 
 		// 3. Name Color picker
-		box->addRow(
+		Ui::AddSkip(container, 16);
+		Ui::AddSubsectionTitle(container, rpl::single(u"Name & Reply Accent Color"_q));
+		container->add(
 			object_ptr<Ui::FlatLabel>(
-				box,
-				u"Name & Reply Color"_q,
-				st::boxDividerLabel),
-			st::boxRowPadding + QMargins(0, st::boxLittleSkip, 0, 0));
-		AddColorSwatchRow(box, 7, state->meta.nameColorId, [=](int idx) {
+				container,
+				rpl::single(u"Accent color for your name in chat headers and message replies."_q),
+				st::boxDividerLabel));
+
+		Ui::AddSkip(container, 8);
+		AddColorSwatchRow(container, 7, state->meta.nameColorId, [=](int idx) {
 			state->meta.nameColorId = idx;
 		});
 
 		// 4. Profile Color picker
-		box->addRow(
+		Ui::AddSkip(container, 16);
+		Ui::AddSubsectionTitle(container, rpl::single(u"Profile Header Backdrop Color"_q));
+		container->add(
 			object_ptr<Ui::FlatLabel>(
-				box,
-				u"Profile Header Color"_q,
-				st::boxDividerLabel),
-			st::boxRowPadding + QMargins(0, st::boxLittleSkip, 0, 0));
-		AddColorSwatchRow(box, 8, state->meta.profileColorId, [=](int idx) {
+				container,
+				rpl::single(u"Backdrop color for your profile banner."_q),
+				st::boxDividerLabel));
+
+		Ui::AddSkip(container, 8);
+		AddColorSwatchRow(container, 8, state->meta.profileColorId, [=](int idx) {
 			state->meta.profileColorId = idx;
 		});
 
-		box->addRow(
+		Ui::AddSkip(container, 16);
+		container->add(
 			object_ptr<Ui::FlatLabel>(
-				box,
-				u"Visible to all MoltenGram users without Telegram Premium. Uses an invisible V3 tag in your last name (or a 10-char pointer to your companion sync bot)."_q,
-				st::boxDividerLabel),
-			st::boxRowPadding + QMargins(0, st::boxLittleSkip, 0, 0));
+				container,
+				rpl::single(u"Visible to all MoltenGram users without Telegram Premium. Encoded invisibly in your profile."_q),
+				st::boxDividerLabel));
 
 		box->addButton(tr::lng_settings_save(), [=] {
 			MoltenProfile::UpdateSelfMetadata(
@@ -1253,6 +1288,22 @@ void ShowProfileStylingBox(not_null<Window::SessionController*> controller) {
 		});
 		box->addButton(tr::lng_cancel(), [=] { box->closeBox(); });
 	}));
+}
+
+void SetupSettings(
+		not_null<Ui::VerticalLayout*> container,
+		not_null<Window::SessionController*> controller) {
+	Ui::AddSubsectionTitle(container, rpl::single(u"Profile Styling & Emoji Status"_q));
+
+	const auto button = container->add(
+		object_ptr<Ui::SettingsButton>(
+			container,
+			rpl::single(u"Profile Appearance & Custom Emoji"_q),
+			st::settingsButtonNoIcon));
+
+	button->setClickedCallback([=] {
+		ShowProfileStylingBox(controller);
+	});
 }
 
 } // namespace Extera::MoltenBotSync

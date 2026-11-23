@@ -733,7 +733,7 @@ void View::requestLyrics() {
 	_linesWidth = 0;
 	_current = -1;
 	_scroll = _scrollFrom = _scrollTo = 0.;
-	if (_title.isEmpty()) {
+	if (!ConfigBoolDefaultTrue(u"player_lrclib_lyrics"_q) || _title.isEmpty()) {
 		_lyrics = Lyrics::None;
 		return;
 	}

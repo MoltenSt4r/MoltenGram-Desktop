@@ -24,9 +24,6 @@ namespace Main {
 class Session;
 } // namespace Main
 
-namespace Extera::PillStack {
-class Widget;
-} // namespace Extera::PillStack
 
 namespace Ui {
 class AbstractButton;
@@ -266,7 +263,6 @@ private:
 	object_ptr<Ui::IconButton> _search;
 	object_ptr<Ui::IconButton> _exdPlugins;
 	base::unique_qptr<Ui::PopupMenu> _exdPluginsMenu;
-	object_ptr<Extera::PillStack::Widget> _pillStack = { nullptr };
 	object_ptr<Ui::IconButton> _infoToggle;
 	object_ptr<Ui::IconButton> _menuToggle;
 	base::unique_qptr<Ui::PopupMenu> _menu;

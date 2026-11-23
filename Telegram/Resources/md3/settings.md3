@@ -1,10 +1,10 @@
 group material;
 exteraPluginCardMargin: margins(10px, 0px, 10px, 8px);
-exteraPluginCardRadius: 18px;
-exteraCardRadius: 18px;
+exteraPluginCardRadius: 16px;
+exteraCardRadius: 16px;
 exteraCategoryGridPadding: margins(10px, 10px, 10px, 0px);
 exteraCategoryCardSkip: 2px;
-exteraCategoryCardRadius: 18px;
+exteraCategoryCardRadius: 16px;
 exteraCategoryTileRadius: 12px;
 sessionListItem: PeerListItem(defaultPeerListItem) {
 	button: OutlineButton(defaultPeerListButton) {
