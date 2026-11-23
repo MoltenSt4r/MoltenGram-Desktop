@@ -19,6 +19,7 @@
 #include "styles/style_settings.h"
 #include "ui/layers/generic_box.h"
 #include "ui/painter.h"
+#include "ui/vertical_list.h"
 #include "ui/widgets/buttons.h"
 #include "ui/widgets/labels.h"
 #include "ui/wrap/slide_wrap.h"
