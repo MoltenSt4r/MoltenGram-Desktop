@@ -146,6 +146,8 @@ struct Model {
 	return result;
 }
 
+[[nodiscard]] Matrix ParseNpy(const QByteArray &raw, int dim);
+
 [[nodiscard]] std::shared_ptr<const Model> LoadModelSnapshot() {
 	{
 		QMutexLocker lock(&ModelMutex());
