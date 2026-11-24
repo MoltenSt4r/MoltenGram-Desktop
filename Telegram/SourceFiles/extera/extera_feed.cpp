@@ -1489,10 +1489,10 @@ void ShowFeedSettings(not_null<Window::SessionController*> controller) {
 			ShowCategoryBox(controller, -1, reopen);
 		});
 		Ui::AddDividerText(content, tr::lng_exd_feed_categories_about());
-		const auto weakOwner = base::make_weak(owner);
+		const auto weakSession = base::make_weak(&owner->session());
 		const auto shownCount = [=] {
 			const auto hidden = HiddenChannels();
-			const auto all = weakOwner ? AllChannels(weakOwner.get()) : std::vector<not_null<History*>>();
+			const auto all = weakSession ? AllChannels(&weakSession->data()) : std::vector<not_null<History*>>();
 			const auto shown = ranges::count_if(all, [&](auto history) {
 				return !hidden.contains(history->peer->id.value);
 			});
@@ -1511,13 +1511,13 @@ void ShowFeedSettings(not_null<Window::SessionController*> controller) {
 			shownLabel->value(),
 			st::settingsButtonNoIcon);
 		shownButton->setClickedCallback([=] {
-			const auto strongOwner = weakOwner.get();
-			if (!strongOwner) {
+			const auto strongSession = weakSession.get();
+			if (!strongSession) {
 				return;
 			}
 			const auto hidden = HiddenChannels();
 			auto selected = base::flat_set<uint64>();
-			for (const auto history : AllChannels(strongOwner)) {
+			for (const auto history : AllChannels(&strongSession->data())) {
 				const auto id = history->peer->id.value;
 				if (!hidden.contains(id)) {
 					selected.emplace(id);
@@ -1528,11 +1528,11 @@ void ShowFeedSettings(not_null<Window::SessionController*> controller) {
 				tr::lng_extera_feed_shown(),
 				std::move(selected),
 				crl::guard(weakBox, [=](base::flat_set<uint64> result) {
-					const auto currentOwner = weakOwner.get();
-					if (!currentOwner) {
+					const auto currentSession = weakSession.get();
+					if (!currentSession) {
 						return;
 					}
-					for (const auto history : AllChannels(currentOwner)) {
+					for (const auto history : AllChannels(&currentSession->data())) {
 						SetChannelHidden(
 							history->peer,
 							!result.contains(history->peer->id.value));
