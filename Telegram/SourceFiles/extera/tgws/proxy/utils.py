@@ -7,7 +7,10 @@ import os
 import re
 import sys
 
-import certifi
+try:
+    import certifi
+except ImportError:
+    certifi = None
 
 from typing import Optional, Dict, List
 from urllib.request import Request
@@ -155,8 +158,14 @@ def set_x25519(context: ssl.SSLContext) -> None:
 
 def create_ssl_context(*, check_hostname: bool = True) -> ssl.SSLContext:
     bundle_dir = getattr(sys, '_MEIPASS', None)
-    cafile = (os.path.join(bundle_dir, 'certifi', 'cacert.pem')
-              if bundle_dir else certifi.where())
+    if bundle_dir:
+        cafile = os.path.join(bundle_dir, 'certifi', 'cacert.pem')
+        if not os.path.exists(cafile):
+            cafile = None
+    elif certifi is not None:
+        cafile = certifi.where()
+    else:
+        cafile = None
     context = ssl.create_default_context(cafile=cafile)
     context.load_default_certs()
     set_x25519(context)

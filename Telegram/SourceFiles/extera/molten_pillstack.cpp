@@ -294,16 +294,18 @@ void SampleMemoryUsage() {
 #elif defined(Q_OS_MAC)
 	mach_port_t host_port = mach_host_self();
 	mach_msg_type_number_t host_size = sizeof(vm_statistics64_data_t) / sizeof(integer_t);
-	vm_size_t pagesize;
-	host_page_size(host_port, &pagesize);
-	vm_statistics64_data_t vm_stat;
-	if (host_statistics64(host_port, HOST_VM_INFO64, (host_info64_t)&vm_stat, &host_size) == KERN_SUCCESS) {
-		const uint64 total = (vm_stat.free_count + vm_stat.active_count + vm_stat.inactive_count + vm_stat.wire_count) * pagesize;
-		const uint64 used = (vm_stat.active_count + vm_stat.wire_count) * pagesize;
-		if (total > 0) {
-			state.systemPercent = int((used * 100) / total);
+	vm_size_t pagesize = 0;
+	if (host_page_size(host_port, &pagesize) == KERN_SUCCESS && pagesize > 0) {
+		vm_statistics64_data_t vm_stat;
+		if (host_statistics64(host_port, HOST_VM_INFO64, (host_info64_t)&vm_stat, &host_size) == KERN_SUCCESS) {
+			const uint64 total = (vm_stat.free_count + vm_stat.active_count + vm_stat.inactive_count + vm_stat.wire_count) * pagesize;
+			const uint64 used = (vm_stat.active_count + vm_stat.wire_count) * pagesize;
+			if (total > 0) {
+				state.systemPercent = int((used * 100) / total);
+			}
 		}
 	}
+	mach_port_deallocate(mach_task_self(), host_port);
 	mach_task_basic_info info;
 	mach_msg_type_number_t size = MACH_TASK_BASIC_INFO_COUNT;
 	if (task_info(mach_task_self(), MACH_TASK_BASIC_INFO, (task_info_t)&info, &size) == KERN_SUCCESS) {
@@ -667,6 +669,9 @@ QString CurrentRatesText() {
 }
 
 void TriggerDcPingProbe(Window::SessionController *controller) {
+	if (!QCoreApplication::instance() || Core::Quitting()) {
+		return;
+	}
 	auto &state = GetDcPingState();
 	if (state.inFlight) {
 		return;
@@ -682,7 +687,7 @@ void TriggerDcPingProbe(Window::SessionController *controller) {
 	state.inFlight = true;
 	const auto host = GetDcHost(state.dcId);
 
-	auto socket = new QTcpSocket();
+	auto socket = new QTcpSocket(qApp);
 	auto timer = std::make_shared<QElapsedTimer>();
 	auto finished = std::make_shared<bool>(false);
 	const auto guardSocket = QPointer<QTcpSocket>(socket);
@@ -704,11 +709,11 @@ void TriggerDcPingProbe(Window::SessionController *controller) {
 		}
 	};
 
-	QObject::connect(socket, &QTcpSocket::connected, [finish, timer] {
+	QObject::connect(socket, &QTcpSocket::connected, socket, [finish, timer] {
 		finish(true, timer);
 	});
 
-	QObject::connect(socket, &QTcpSocket::errorOccurred, [finish, timer](QAbstractSocket::SocketError) {
+	QObject::connect(socket, &QTcpSocket::errorOccurred, socket, [finish, timer](QAbstractSocket::SocketError) {
 		finish(false, timer);
 	});
 
@@ -721,6 +726,9 @@ void TriggerDcPingProbe(Window::SessionController *controller) {
 }
 
 void RefreshWeather(bool force) {
+	if (!QCoreApplication::instance() || Core::Quitting()) {
+		return;
+	}
 	auto &state = GetWeatherState();
 	const auto now = QDateTime::currentMSecsSinceEpoch();
 	if (!force && state.lastFetch > 0 && (now - state.lastFetch < 15 * 60 * 1000)) {
@@ -740,11 +748,15 @@ void RefreshWeather(bool force) {
 
 	auto req = QNetworkRequest(QUrl(urlStr));
 	req.setHeader(QNetworkRequest::UserAgentHeader, u"MoltenGram/2.0"_q);
+	req.setTransferTimeout(15000);
 
 	const auto reply = NetworkManager()->get(req);
-	QObject::connect(reply, &QNetworkReply::finished, [=, &state] {
+	QObject::connect(reply, &QNetworkReply::finished, reply, [=, &state] {
 		reply->deleteLater();
 		state.inFlight = false;
+		if (Core::Quitting()) {
+			return;
+		}
 		if (reply->error() == QNetworkReply::NoError) {
 			const auto doc = QJsonDocument::fromJson(reply->readAll());
 			const auto obj = doc.object();
@@ -759,6 +771,9 @@ void RefreshWeather(bool force) {
 }
 
 void RefreshRates(bool force) {
+	if (!QCoreApplication::instance() || Core::Quitting()) {
+		return;
+	}
 	auto &state = GetRatesState();
 	const auto now = QDateTime::currentMSecsSinceEpoch();
 	if (!force && state.lastFetch > 0 && (now - state.lastFetch < 10 * 60 * 1000)) {
@@ -768,16 +783,26 @@ void RefreshRates(bool force) {
 		return;
 	}
 	state.inFlight = true;
+	const auto pending = std::make_shared<int>(2);
+	const auto finishOne = [pending, &state] {
+		if (--(*pending) <= 0) {
+			state.inFlight = false;
+		}
+	};
 
 	// 1. CoinGecko API for BTC, TON, ETH, SOL, DOGE, NOT
 	const auto cgUrl = QUrl(u"https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,the-open-network,ethereum,solana,dogecoin,notcoin&vs_currencies=usd,eur,rub"_q);
 	auto cgReq = QNetworkRequest(cgUrl);
 	cgReq.setHeader(QNetworkRequest::UserAgentHeader, u"MoltenGram/2.0"_q);
+	cgReq.setTransferTimeout(15000);
 
 	const auto cgReply = NetworkManager()->get(cgReq);
-	QObject::connect(cgReply, &QNetworkReply::finished, [=, &state] {
+	QObject::connect(cgReply, &QNetworkReply::finished, cgReply, [=, &state] {
 		cgReply->deleteLater();
-		state.inFlight = false;
+		finishOne();
+		if (Core::Quitting()) {
+			return;
+		}
 		if (cgReply->error() == QNetworkReply::NoError) {
 			const auto doc = QJsonDocument::fromJson(cgReply->readAll());
 			const auto obj = doc.object();
@@ -820,10 +845,15 @@ void RefreshRates(bool force) {
 	const auto cbrUrl = QUrl(u"https://www.cbr-xml-daily.ru/daily_json.js"_q);
 	auto cbrReq = QNetworkRequest(cbrUrl);
 	cbrReq.setHeader(QNetworkRequest::UserAgentHeader, u"MoltenGram/2.0"_q);
+	cbrReq.setTransferTimeout(15000);
 
 	const auto cbrReply = NetworkManager()->get(cbrReq);
-	QObject::connect(cbrReply, &QNetworkReply::finished, [=, &state] {
+	QObject::connect(cbrReply, &QNetworkReply::finished, cbrReply, [=, &state] {
 		cbrReply->deleteLater();
+		finishOne();
+		if (Core::Quitting()) {
+			return;
+		}
 		if (cbrReply->error() == QNetworkReply::NoError) {
 			const auto doc = QJsonDocument::fromJson(cbrReply->readAll());
 			const auto valute = doc.object().value(u"Valute"_q).toObject();
@@ -967,7 +997,7 @@ void PaintPills(
 
 Widget::Widget(QWidget *parent, Window::SessionController *controller)
 : Ui::RpWidget(parent)
-, _controller(controller)
+, _controller(controller ? base::make_weak(controller) : base::weak_ptr<Window::SessionController>())
 , _refreshTimer([=] { updateData(); }) {
 	setAttribute(Qt::WA_OpaquePaintEvent, false);
 	setMouseTracking(true);
@@ -1208,32 +1238,42 @@ void Widget::mouseReleaseEvent(QMouseEvent *e) {
 
 void Widget::contextMenuEvent(QContextMenuEvent *e) {
 	const auto idx = pillAt(e->pos());
-	auto menu = std::make_unique<QMenu>(this);
+	auto *menu = new QMenu(this);
+	menu->setAttribute(Qt::WA_DeleteOnClose);
 
-	if (_controller) {
+	const auto weakWidget = QPointer<Widget>(this);
+	const auto weakController = _controller;
+
+	if (const auto controller = weakController.get()) {
 		menu->addAction(u"PillStack Settings..."_q, [=] {
-			ShowSettingsBox(_controller);
+			if (const auto strong = weakController.get()) {
+				ShowSettingsBox(strong);
+			}
 		});
 		menu->addSeparator();
 	}
 
 	menu->addAction(u"Refresh All Telemetry"_q, [=] {
-		TriggerDcPingProbe(_controller);
+		TriggerDcPingProbe(weakController.get());
 		RefreshWeather(true);
 		RefreshRates(true);
-		updateData();
+		if (weakWidget) {
+			weakWidget->updateData();
+		}
 	});
 
 	if (idx >= 0 && idx < int(_pills.size())) {
-		const auto &pill = _pills[idx];
+		const auto pill = _pills[idx];
 		menu->addSeparator();
 		menu->addAction(QString("Hide '%1' Badge").arg(pill.id), [=] {
 			SetPillEnabled(pill.type, false);
-			updateData();
+			if (weakWidget) {
+				weakWidget->updateData();
+			}
 		});
 	}
 
-	menu->exec(e->globalPos());
+	menu->popup(e->globalPos());
 }
 
 void Widget::onPillClicked(int index) {
@@ -1243,7 +1283,7 @@ void Widget::onPillClicked(int index) {
 	const auto &pill = _pills[index];
 	switch (pill.type) {
 	case PillType::DcPing:
-		TriggerDcPingProbe(_controller);
+		TriggerDcPingProbe(_controller.get());
 		updateData();
 		break;
 	case PillType::NetSpeed:

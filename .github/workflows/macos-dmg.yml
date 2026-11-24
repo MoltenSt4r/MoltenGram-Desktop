@@ -29,7 +29,18 @@ jobs:
           mkdir -p "dmg_$ARCH"
           ditto -x -k "MoltenGram-Desktop-macos-$ARCH.$VERSION.zip" "dmg_$ARCH"
           ln -s /Applications "dmg_$ARCH/Applications"
-          hdiutil create -volname "MoltenGram Desktop" -srcfolder "dmg_$ARCH" -ov -format UDZO \
-            "MoltenGram-Desktop-macos-$ARCH.$VERSION.dmg"
+          DMG_OUT="MoltenGram-Desktop-macos-$ARCH.$VERSION.dmg"
+          for attempt in 1 2 3 4 5; do
+            hdiutil detach "/Volumes/MoltenGram Desktop" -force >/dev/null 2>&1 || true
+            rm -f "$DMG_OUT"
+            if hdiutil create -volname "MoltenGram Desktop" -srcfolder "dmg_$ARCH" -ov -format UDZO "$DMG_OUT"; then
+              break
+            fi
+            if [ "$attempt" -eq 5 ]; then
+              echo "hdiutil create failed after 5 attempts"
+              exit 1
+            fi
+            sleep 5
+          done
           gh release upload "$TAG" --repo "$GITHUB_REPOSITORY" \
-            "MoltenGram-Desktop-macos-$ARCH.$VERSION.dmg" --clobber
+            "$DMG_OUT" --clobber

@@ -4626,8 +4626,14 @@ void Widget::updateControlsGeometry() {
 		? ((smallw - ratiow) / float64(smallw - _narrowWidth))
 		: 0.;
 
-	if (_pillStack && (narrowRatio > 0.5 || ratiow < smallw)) {
-		_pillStack->hide();
+	if (_pillStack) {
+		const auto showPills = Extera::PillStack::Enabled()
+			&& !_openedFolder
+			&& !_openedForum
+			&& !_openedCommunity
+			&& (_layout != Layout::Child)
+			&& !(narrowRatio > 0.5 || ratiow < smallw);
+		_pillStack->setVisible(showPills);
 	}
 
 	auto filterLeft = (controller()->filtersWidth()
@@ -4774,7 +4780,7 @@ void Widget::updateControlsGeometry() {
 		_frozenAccountBar->resize(barw, _frozenAccountBar->height());
 	}
 	_updateScrollGeometryCached = [=] {
-		const auto pillStackHeight = (_pillStack && _pillStack->isVisible())
+		const auto pillStackHeight = (_pillStack && !_pillStack->isHidden())
 			? style::ConvertScale(32)
 			: 0;
 		const auto pillStackTop = expandedStoriesTop

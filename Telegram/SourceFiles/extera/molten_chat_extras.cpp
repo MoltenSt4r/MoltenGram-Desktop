@@ -40,9 +40,12 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/wrap/vertical_layout.h"
 #include "window/window_session_controller.h"
 
+#include <QtCore/QCoreApplication>
 #include <QtCore/QDir>
 #include <QtCore/QFile>
 #include <QtCore/QFileInfo>
+#include <QtGui/QClipboard>
+#include <QtGui/QGuiApplication>
 #include <QtCore/QJsonArray>
 #include <QtCore/QJsonDocument>
 #include <QtCore/QJsonObject>
@@ -69,8 +72,8 @@ constexpr auto kMaxRetainedQuotesMemory = 3000;
 class QuoteStore final {
 public:
 	static QuoteStore &Instance() {
-		static QuoteStore store;
-		return store;
+		static auto *store = new QuoteStore();
+		return *store;
 	}
 
 	void retain(FullMsgId id, const QString &authorName, const QString &text, TimeId date) {
@@ -89,7 +92,9 @@ public:
 			_quotes.erase(_quotes.begin());
 		}
 		_dirty = true;
-		_saveTimer.callOnce(1000);
+		if (QCoreApplication::instance()) {
+			_saveTimer.callOnce(1000);
+		}
 	}
 
 	[[nodiscard]] std::optional<RetainedQuote> find(FullMsgId id) {
@@ -128,6 +133,11 @@ public:
 private:
 	QuoteStore() {
 		_saveTimer.setCallback([this] { saveToFile(); });
+		qAddPostRoutine([] {
+			if (QCoreApplication::instance()) {
+				QuoteStore::Instance().saveNow();
+			}
+		});
 	}
 
 	void ensureLoaded() {
@@ -153,7 +163,7 @@ private:
 			}
 			const auto obj = item.toObject();
 			const auto peerId = PeerId(obj.value(u"peerId"_q).toString().toULongLong());
-			const auto msgId = MsgId(obj.value(u"msgId"_q).toInt());
+			const auto msgId = MsgId(obj.value(u"msgId"_q).toInteger());
 			const auto author = obj.value(u"author"_q).toString();
 			const auto text = obj.value(u"text"_q).toString();
 			const auto date = TimeId(obj.value(u"date"_q).toInt());
@@ -338,9 +348,16 @@ bool HandleDoubleTapAction(
 			return false;
 		}
 		const auto emoji = DefaultReactionEmoji();
-		const auto reactionId = emoji.startsWith(u"animated_"_q)
-			? Data::ReactionId{ emoji.mid(9).toULongLong() }
-			: Data::ReactionId{ emoji.isEmpty() ? u"👍"_q : emoji };
+		auto reactionId = Data::ReactionId{ emoji.isEmpty() ? u"👍"_q : emoji };
+		if (emoji.startsWith(u"animated_"_q)) {
+			auto ok = false;
+			const auto docId = emoji.mid(9).toULongLong(&ok);
+			if (ok && docId != 0) {
+				reactionId = Data::ReactionId{ docId };
+			} else {
+				reactionId = Data::ReactionId{ u"👍"_q };
+			}
+		}
 		if (view) {
 			view->animateReaction(Ui::ReactionFlyAnimationArgs{ .id = reactionId });
 		}
@@ -377,7 +394,9 @@ bool HandleDoubleTapAction(
 			controller->showToast(u"No text to copy."_q);
 			return false;
 		}
-		QGuiApplication::clipboard()->setText(text);
+		if (const auto clipboard = QGuiApplication::clipboard()) {
+			clipboard->setText(text);
+		}
 		controller->showToast(u"Message text copied to clipboard."_q);
 		return true;
 	}

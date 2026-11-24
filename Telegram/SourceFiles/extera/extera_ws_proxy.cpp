@@ -7,6 +7,7 @@
 #include "base/timer.h"
 #include "platform/platform_specific.h"
 
+#include <QtCore/QCoreApplication>
 #include <QtCore/QProcess>
 #include <QtCore/QFile>
 #include <QtCore/QStandardPaths>
@@ -31,8 +32,8 @@ struct State {
 };
 
 State &Instance() {
-	static auto result = State();
-	return result;
+	static auto *const result = new State();
+	return *result;
 }
 
 [[nodiscard]] QString PythonDir() {
@@ -102,7 +103,7 @@ void Launch();
 
 void ScheduleRestart() {
 	auto &state = Instance();
-	if (state.stopping || !Enabled()) {
+	if (state.stopping || !Enabled() || !Core::IsAppLaunched() || Core::Quitting()) {
 		return;
 	} else if (state.restarts >= kMaxRestarts) {
 		const auto &settings = Core::App().settings().proxy();
@@ -120,10 +121,19 @@ void ScheduleRestart() {
 	state.restartTimer->callOnce(kRestartDelay);
 }
 
+void Stop();
+
 void Launch() {
 	auto &state = Instance();
-	if (state.process || !Available()) {
+	if (state.process || !Available() || !Core::IsAppLaunched() || Core::Quitting()) {
 		return;
+	}
+	static auto quitHooked = false;
+	if (!quitHooked && qApp) {
+		quitHooked = true;
+		QObject::connect(qApp, &QCoreApplication::aboutToQuit, [] {
+			Stop();
+		});
 	}
 	state.stopping = false;
 	const auto port = ChoosePort();
@@ -180,12 +190,18 @@ void Launch() {
 	const auto process = new QProcess(qApp);
 	state.process = process;
 	process->setWorkingDirectory(PythonDir());
+	const auto interpreter = Interpreter();
 #ifndef Q_OS_WIN
 	auto environment = QProcessEnvironment::systemEnvironment();
+	// Avoid poisoning a system python3 with launcher PYTHONHOME from an unrelated runtime.
+	if (!interpreter.startsWith(PythonDir())) {
+		environment.remove(u"PYTHONHOME"_q);
+		environment.remove(u"PYTHONNOUSERSITE"_q);
+	}
 	environment.insert(u"EXD_TGWS_LIB"_q, psAppDataPath() + u"tgws-lib"_q);
 	process->setProcessEnvironment(environment);
 #endif
-	process->setProgram(Interpreter());
+	process->setProgram(interpreter);
 	process->setArguments(QStringList{
 		u"-I"_q,
 		Script(),
@@ -197,25 +213,36 @@ void Launch() {
 	} + extra);
 	process->setStandardOutputFile(QProcess::nullDevice());
 	process->setStandardErrorFile(QProcess::nullDevice());
-	QObject::connect(process, &QProcess::started, [=] {
+	QObject::connect(process, &QProcess::started, process, [=] {
+		auto &state = Instance();
+		if (state.stopping
+			|| state.process != process
+			|| !Core::IsAppLaunched()
+			|| Core::Quitting()) {
+			return;
+		}
 		Core::App().setCurrentProxy(
-			Instance().proxy,
+			state.proxy,
 			MTP::ProxyData::Settings::Enabled);
 	});
 	QObject::connect(
 		process,
 		&QProcess::finished,
+		process,
 		[=](int, QProcess::ExitStatus) {
 			auto &state = Instance();
 			if (state.process == process) {
 				state.process = nullptr;
 				process->deleteLater();
-				ScheduleRestart();
+				if (!state.stopping && Core::IsAppLaunched() && !Core::Quitting()) {
+					ScheduleRestart();
+				}
 			}
 		});
 	QObject::connect(
 		process,
 		&QProcess::errorOccurred,
+		process,
 		[=](QProcess::ProcessError error) {
 			if (error != QProcess::FailedToStart) {
 				return;
@@ -239,6 +266,9 @@ void Stop() {
 		process->kill();
 		process->waitForFinished(1000);
 		process->deleteLater();
+	}
+	if (!Core::IsAppLaunched()) {
+		return;
 	}
 	const auto &settings = Core::App().settings().proxy();
 	if (settings.isEnabled() && IsOurs(settings.selected())) {

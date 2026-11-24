@@ -18,6 +18,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/widgets/checkbox.h"
 
 #include "extera/extera_config.h"
+#include "extera/molten_device_spoof.h"
+#include "extera/molten_voice_changer.h"
 #include "extera/exd_md3.h"
 #include "extera/extera_welcome.h"
 #include "extera/extera_badges.h"
@@ -218,6 +220,8 @@ Application::Application()
 		cExeDir() + u"exd_install.conf"_q,
 		psAppDataPath() + u"exd_install.conf"_q,
 	});
+	Extera::DeviceSpoof::Enabled();
+	Extera::VoiceChanger::Enabled();
 	Extera::Config::Instance().boolChanges(
 		u"ayu_features"_q
 	) | rpl::filter([](bool enabled) {

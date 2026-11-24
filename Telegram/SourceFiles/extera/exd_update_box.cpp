@@ -351,10 +351,13 @@ void ShowUpdateBox(not_null<Window::SessionController*> controller) {
 				state->syncing = true;
 				crl::on_main(box, [=] { state->render(); });
 				const auto weak = base::make_weak(box.get());
+				const auto weakController = base::make_weak(controller);
 				Exd::SettingsSync::Upload(session, [=](QString error) {
-					controller->showToast(error.isEmpty()
-						? tr::lng_exd_sync_uploaded(tr::now)
-						: tr::lng_exd_sync_failed(tr::now, lt_error, error));
+					if (const auto strongController = weakController.get()) {
+						strongController->showToast(error.isEmpty()
+							? tr::lng_exd_sync_uploaded(tr::now)
+							: tr::lng_exd_sync_failed(tr::now, lt_error, error));
+					}
 					if (weak) {
 						state->syncing = false;
 						state->render();

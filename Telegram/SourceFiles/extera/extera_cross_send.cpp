@@ -104,11 +104,15 @@ void SendParts(
 
 void ChooseAndSend(
 		std::shared_ptr<State> state,
-		not_null<Main::Account*> to,
+		base::weak_ptr<Main::Account> to,
 		int attempt) {
+	const auto strongTo = to.get();
+	if (!strongTo || !Core::IsAppLaunched() || Core::Quitting()) {
+		return;
+	}
 	const auto window = Core::App().activePrimaryWindow();
 	const auto controller = window ? window->sessionController() : nullptr;
-	if (!controller || (&controller->session().account() != to)) {
+	if (!controller || (&controller->session().account() != strongTo)) {
 		if (attempt < kWaitControllerAttempts) {
 			base::call_delayed(kWaitControllerDelay, [=] {
 				ChooseAndSend(state, to, attempt + 1);
@@ -117,23 +121,27 @@ void ChooseAndSend(
 		return;
 	}
 	const auto parts = state->parts;
+	const auto weakController = base::make_weak(controller);
 	Window::ShowChooseRecipientBox(controller, [=](
 			not_null<Data::Thread*> thread) {
 		SendParts(parts, thread);
-		controller->showPeerHistory(thread->peer());
+		if (const auto strong = weakController.get()) {
+			strong->showPeerHistory(thread->peer());
+		}
 		return true;
 	});
 }
 
-void Proceed(std::shared_ptr<State> state, not_null<Main::Account*> to) {
+void Proceed(std::shared_ptr<State> state, base::weak_ptr<Main::Account> to) {
 	if (state->finished) {
 		return;
 	}
 	state->finished = true;
 	state->lifetime.destroy();
 	crl::on_main([=] {
-		if (to->sessionExists()) {
-			Core::App().domain().activate(to);
+		const auto strong = to.get();
+		if (strong && Core::IsAppLaunched() && !Core::Quitting() && strong->sessionExists()) {
+			Core::App().domain().activate(strong);
 			ChooseAndSend(state, to, 0);
 		}
 	});
@@ -175,11 +183,15 @@ struct RelayState {
 
 void RelayChoose(
 		std::shared_ptr<RelayState> state,
-		not_null<Main::Account*> to,
+		base::weak_ptr<Main::Account> to,
 		int attempt) {
+	const auto strongTo = to.get();
+	if (!strongTo || !Core::IsAppLaunched() || Core::Quitting()) {
+		return;
+	}
 	const auto window = Core::App().activePrimaryWindow();
 	const auto controller = window ? window->sessionController() : nullptr;
-	if (!controller || (&controller->session().account() != to)) {
+	if (!controller || (&controller->session().account() != strongTo)) {
 		if (attempt < kWaitControllerAttempts) {
 			base::call_delayed(kWaitControllerDelay, [=] {
 				RelayChoose(state, to, attempt + 1);
@@ -189,6 +201,7 @@ void RelayChoose(
 	}
 	const auto session = &controller->session();
 	const auto ids = state->received;
+	const auto weakController = base::make_weak(controller);
 	Window::ShowChooseRecipientBox(controller, [=](
 			not_null<Data::Thread*> thread) {
 		auto items = HistoryItemsList();
@@ -204,27 +217,30 @@ void RelayChoose(
 		session->api().forwardMessages(
 			Data::ResolvedForwardDraft{ .items = std::move(items) },
 			Api::SendAction(thread),
-			[=] {
+			crl::guard(session, [=] {
 				session->data().histories().deleteMessages(relay, true);
 				session->data().sendHistoryChangeNotifications();
-			});
-		controller->showPeerHistory(thread->peer());
+			}));
+		if (const auto strong = weakController.get()) {
+			strong->showPeerHistory(thread->peer());
+		}
 		return true;
 	});
 }
 
 void RelayFinish(
 		std::shared_ptr<RelayState> state,
-		not_null<Main::Account*> to) {
+		base::weak_ptr<Main::Account> to) {
 	if (state->finished) {
 		return;
 	}
 	state->finished = true;
 	state->lifetime.destroy();
-	if (state->received.empty() || !to->sessionExists()) {
+	const auto strong = to.get();
+	if (!strong || Core::Quitting() || state->received.empty() || !strong->sessionExists()) {
 		return;
 	}
-	Core::App().domain().activate(to);
+	Core::App().domain().activate(strong);
 	RelayChoose(state, to, 0);
 }
 
@@ -233,6 +249,10 @@ void RelayTo(
 		HistoryItemsList items,
 		not_null<UserData*> target,
 		not_null<Main::Account*> to) {
+	if (!to->sessionExists()) {
+		return;
+	}
+	const auto weakTo = base::make_weak(to.get());
 	const auto session = &to->session();
 	const auto fromPeerId = from->userPeerId();
 	const auto state = std::make_shared<RelayState>();
@@ -243,11 +263,11 @@ void RelayTo(
 	}) | rpl::on_next([=](not_null<HistoryItem*> item) {
 		state->received.push_back(item->fullId());
 		if (int(state->received.size()) >= state->expected) {
-			crl::on_main([=] { RelayFinish(state, to); });
+			crl::on_main([=] { RelayFinish(state, weakTo); });
 		}
 	}, state->lifetime);
 	base::call_delayed(crl::time(15000), [=] {
-		RelayFinish(state, to);
+		RelayFinish(state, weakTo);
 	});
 	from->api().forwardMessages(
 		Data::ResolvedForwardDraft{ .items = std::move(items) },
@@ -287,14 +307,18 @@ void AddSendFromAccountActions(
 			added = true;
 		}
 		const auto name = account->session().user()->name();
+		const auto weakTarget = base::make_weak(account);
 		menu->addAction(
 			tr::lng_exd_send_from(tr::now, lt_name, name),
 			[=] {
 				closeBox();
-				const auto source = &from->account();
+				const auto weakSource = base::make_weak(&from->account());
 				base::call_delayed(crl::time(50), [=] {
-					if (account->sessionExists() && source->sessionExists()) {
-						SendFromAccount(&source->session(), ids, account);
+					if (Core::Quitting() || !weakTarget || !weakSource) {
+						return;
+					}
+					if (weakTarget->sessionExists() && weakSource->sessionExists()) {
+						SendFromAccount(&weakSource->session(), ids, weakTarget.get());
 					}
 				});
 			},
@@ -325,19 +349,28 @@ void SendFromAccount(
 		return;
 	}
 	const auto owner = &from->data();
-	const auto done = [=](const MTPcontacts_ResolvedPeer &result) {
+	const auto weakTo = base::make_weak(to.get());
+	const auto done = crl::guard(from, [=](const MTPcontacts_ResolvedPeer &result) {
 		result.match([&](const MTPDcontacts_resolvedPeer &data) {
 			owner->processUsers(data.vusers());
 			owner->processChats(data.vchats());
 		});
+		const auto strongTo = weakTo.get();
+		if (!strongTo || !strongTo->sessionExists()) {
+			return;
+		}
 		const auto user = owner->userLoaded(peerToUser(targetId));
 		if (user && user->accessHash()) {
-			RelayTo(from, items, user, to);
+			RelayTo(from, items, user, strongTo);
 		} else {
-			CopyFromAccount(from, ids, to);
+			CopyFromAccount(from, ids, strongTo);
 		}
-	};
-	const auto fail = [=] { CopyFromAccount(from, ids, to); };
+	});
+	const auto fail = crl::guard(from, [=] {
+		if (const auto strongTo = weakTo.get(); strongTo && strongTo->sessionExists()) {
+			CopyFromAccount(from, ids, strongTo);
+		}
+	});
 	const auto username = targetSelf->username();
 	if (!username.isEmpty()) {
 		from->api().request(MTPcontacts_ResolveUsername(
@@ -403,15 +436,16 @@ void CopyFromAccount(
 	if (state->parts.empty()) {
 		return;
 	}
+	const auto weakTo = base::make_weak(to.get());
 	if (CheckReady(state)) {
-		Proceed(state, to);
+		Proceed(state, weakTo);
 		return;
 	}
 	from->downloaderTaskFinished(
 	) | rpl::on_next([=] {
 		if (CheckReady(state)) {
 			crl::on_main([=] {
-				Proceed(state, to);
+				Proceed(state, weakTo);
 			});
 		}
 	}, state->lifetime);

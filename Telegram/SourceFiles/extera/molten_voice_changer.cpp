@@ -34,6 +34,9 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/wrap/vertical_layout.h"
 #include "window/window_session_controller.h"
 
+#include <QtCore/QCoreApplication>
+#include <QtCore/QMutex>
+#include <QtCore/QThread>
 #include <rpl/rpl.h>
 #include <rpl/variable.h>
 
@@ -414,7 +417,7 @@ private:
 		outPos += hopOut;
 	}
 
-	const size_t totalValid = outPos;
+	const size_t totalValid = std::min(outPos, accum.size());
 	std::vector<int16_t> output(totalValid);
 	for (size_t i = 0; i < totalValid; ++i) {
 		float sample = accum[i];
@@ -431,13 +434,21 @@ private:
 
 // Dummy Document for preview audio playback
 [[nodiscard]] not_null<DocumentData*> CreatePreviewDocument(
-		not_null<Data::Session*> owner) {
+		not_null<Data::Session*> owner,
+		crl::time durationMs) {
 	return owner->document(
 		base::RandomValue<DocumentId>(),
 		uint64(0),
 		QByteArray(),
 		base::unixtime::now(),
-		QVector<MTPDocumentAttribute>(),
+		QVector<MTPDocumentAttribute>{
+			MTP_documentAttributeAudio(
+				MTP_flags(MTPDdocumentAttributeAudio::Flag::f_voice),
+				MTP_int(int(std::max<crl::time>(1, durationMs / 1000))),
+				MTPstring(),
+				MTPstring(),
+				MTPbytes()),
+		},
 		QString(),
 		InlineImageLocation(),
 		ImageWithLocation(),
@@ -668,16 +679,15 @@ namespace {
 	const auto pktGuard = gsl::finally([&] {
 		av_packet_free(&packet);
 	});
+	if (!packet) {
+		return {};
+	}
 
 	std::vector<int16_t> pcm;
 	pcm.reserve(targetSampleRate * 4);
 
 	const auto drainFrame = [&] {
-		const int outSamples = av_rescale_rnd(
-			swr_get_delay(swr, targetSampleRate) + frame->nb_samples,
-			targetSampleRate,
-			frame->sample_rate ? frame->sample_rate : targetSampleRate,
-			AV_ROUND_UP);
+		const int outSamples = swr_get_out_samples(swr, frame->nb_samples);
 		if (outSamples <= 0) {
 			return;
 		}
@@ -756,6 +766,7 @@ namespace {
 	AVChannelLayout monoLayout = AV_CHANNEL_LAYOUT_MONO;
 	av_channel_layout_copy(&encCtx->ch_layout, &monoLayout);
 	encCtx->sample_rate = sampleRate;
+	encCtx->time_base = AVRational{ 1, sampleRate };
 	outStream->time_base = AVRational{ 1, sampleRate };
 
 	if (outputFormat->oformat->flags & AVFMT_GLOBALHEADER) {
@@ -814,6 +825,9 @@ namespace {
 	const auto pktGuard = gsl::finally([&] {
 		av_packet_free(&pkt);
 	});
+	if (!pkt) {
+		return {};
+	}
 
 	const auto writePackets = [&] {
 		while (avcodec_receive_packet(encCtx.get(), pkt) >= 0) {
@@ -835,8 +849,13 @@ namespace {
 			srcSamples = paddedBuffer.data();
 		}
 
+		if (av_frame_make_writable(frame.get()) < 0) {
+			break;
+		}
 		const uint8_t *inData = reinterpret_cast<const uint8_t*>(srcSamples);
-		swr_convert(swr, frame->extended_data, frameSize, &inData, frameSize);
+		if (swr_convert(swr, frame->extended_data, frameSize, &inData, frameSize) < 0) {
+			continue;
+		}
 		frame->pts = pts;
 		pts += frameSize;
 
@@ -957,22 +976,56 @@ ProcessResult ProcessVoiceBytes(const QByteArray &opusOggData) {
 
 namespace {
 
+QMutex StreamMutex;
+QMutex ParamsMutex;
 std::unique_ptr<Processor> RealtimeStreamProcessor;
+bool CachedEnabled = false;
+Parameters CachedParams;
+bool ParamsInitialized = false;
+
+void RefreshParamsCacheOnMain() {
+	if (qApp && QThread::currentThread() != qApp->thread()) {
+		return;
+	}
+	const auto enabled = Config::Instance().boolValue(kConfigVoiceChangerEnabled);
+	const int val = Config::Instance().intValue(kConfigVoiceChangerPreset);
+	const auto preset = (val >= 0 && val <= static_cast<int>(Preset::Custom))
+		? static_cast<Preset>(val)
+		: Preset::Normal;
+	const auto params = ParametersForPreset(preset);
+	QMutexLocker lock(&ParamsMutex);
+	CachedEnabled = enabled;
+	CachedParams = params;
+	ParamsInitialized = true;
+}
 
 } // namespace
 
 void ProcessPcmStream(int16_t *samples, int count, int sampleRate) {
-	if (!Enabled() || !samples || count <= 0) {
+	if (!samples || count <= 0) {
 		return;
 	}
+	bool enabled = false;
+	Parameters params;
+	{
+		QMutexLocker lock(&ParamsMutex);
+		enabled = ParamsInitialized ? CachedEnabled : false;
+		params = CachedParams;
+	}
+	if (!enabled) {
+		return;
+	}
+	QMutexLocker streamLock(&StreamMutex);
 	if (!RealtimeStreamProcessor) {
 		RealtimeStreamProcessor = std::make_unique<Processor>();
 	}
-	RealtimeStreamProcessor->setParameters(CurrentParameters());
+	RealtimeStreamProcessor->setParameters(params);
 	RealtimeStreamProcessor->process(samples, count, sampleRate);
 }
 
 void ResetPcmStream() {
+	RefreshParamsCacheOnMain();
+	QMutexLocker streamLock(&StreamMutex);
 	if (RealtimeStreamProcessor) {
 		RealtimeStreamProcessor->reset();
 	}
@@ -983,11 +1036,18 @@ void ResetPcmStream() {
 // ============================================================================
 
 bool Enabled() {
-	return Config::Instance().boolValue(kConfigVoiceChangerEnabled);
+	if (!qApp || QThread::currentThread() == qApp->thread()) {
+		RefreshParamsCacheOnMain();
+		QMutexLocker lock(&ParamsMutex);
+		return CachedEnabled;
+	}
+	QMutexLocker lock(&ParamsMutex);
+	return ParamsInitialized ? CachedEnabled : false;
 }
 
 void SetEnabled(bool enabled) {
 	Config::Instance().setBool(kConfigVoiceChangerEnabled, enabled);
+	RefreshParamsCacheOnMain();
 	if (!enabled) {
 		ResetPcmStream();
 	}
@@ -1195,7 +1255,13 @@ Parameters ParametersForPreset(Preset preset) {
 }
 
 Parameters CurrentParameters() {
-	return ParametersForPreset(ActivePreset());
+	if (!qApp || QThread::currentThread() == qApp->thread()) {
+		RefreshParamsCacheOnMain();
+		QMutexLocker lock(&ParamsMutex);
+		return CachedParams;
+	}
+	QMutexLocker lock(&ParamsMutex);
+	return ParamsInitialized ? CachedParams : Parameters{};
 }
 
 void SetCustomParameters(const Parameters &params) {
@@ -1497,12 +1563,18 @@ void ShowVoiceChangerDialog(
 				rpl::single(u"Play / Stop Audio Preview"_q),
 				st::settingsButtonNoIcon));
 
+		const auto weakController = base::make_weak(controller);
 		previewBtn->setClickedCallback([=] {
 			using namespace ::Media::Player;
 			if (state->isPlaying) {
 				instance()->stop(AudioMsgId::Type::Voice, true);
 				state->isPlaying = false;
 				Ui::Toast::Show(u"Preview stopped."_q);
+				return;
+			}
+
+			const auto strong = weakController.get();
+			if (!strong) {
 				return;
 			}
 
@@ -1525,7 +1597,11 @@ void ShowVoiceChangerDialog(
 				return;
 			}
 
-			state->document = CreatePreviewDocument(&controller->session().data());
+			if (!state->document) {
+				state->document = CreatePreviewDocument(
+					&strong->session().data(),
+					originalDuration);
+			}
 			const auto mediaView = state->document->createMediaView();
 			mediaView->setBytes(state->processedData.bytes);
 			state->document->size = state->processedData.bytes.size();

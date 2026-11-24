@@ -993,10 +993,11 @@ void ShowSettingsBox(not_null<Window::SessionController*> controller) {
 					s.width());
 			}, label->lifetime());
 
+			const auto guardLabel = QPointer<Ui::FlatLabel>(label);
 			row->setClickedCallback([=] {
-				ShowShapePickerBox(controller, type, [=](int picked) {
-					label->setText(ShapeName(picked));
-				});
+				ShowShapePickerBox(controller, type, crl::guard(guardLabel, [=](int picked) {
+					guardLabel->setText(ShapeName(picked));
+				}));
 			});
 		}
 

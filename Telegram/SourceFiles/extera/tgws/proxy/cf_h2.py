@@ -9,10 +9,17 @@ from collections import deque
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Set, Tuple
 
-import httpx
+try:
+    import httpx
+    from .h2_transport import H2Transport, H2_AVAILABLE
+    CF_H2_AVAILABLE = bool(H2_AVAILABLE)
+except ImportError:
+    httpx = None
+    H2Transport = None
+    CF_H2_AVAILABLE = False
 
+_HTTPX_ERRORS = (httpx.HTTPError,) if httpx is not None else ()
 from .balancer import balancer
-from .h2_transport import H2Transport
 from .stats import stats
 from .utils import (
     DC_DEFAULT_IPS, PROTO_TAG_ABRIDGED,
@@ -495,7 +502,7 @@ class _HttpChannel:
             if trace is not None:
                 trace.phase = 'error-' + type(exc).__name__
             stats.h2_errors += 1
-            if isinstance(exc, (httpx.HTTPError, OSError, ValueError, BufferError)):
+            if isinstance(exc, _HTTPX_ERRORS + (OSError, ValueError, BufferError)):
                 log.warning('[%s] H2 lane=%d channel=%d request failed: %s: %s; '
                             'detail=[%s]; '
                             'closing native channel, reconnect may select another domain',
@@ -795,7 +802,7 @@ class _HttpLane:
             raise
         except _ReplyBufferFull:
             raise
-        except (httpx.HTTPError, OSError, ValueError, BufferError):
+        except _HTTPX_ERRORS + (OSError, ValueError, BufferError):
             self.errors += 1
             self.failed_until = time.monotonic() + DOMAIN_COOLDOWN
             raise
@@ -867,6 +874,8 @@ class CfH2Pool:
         self.closed = False
 
     async def open(self, dc: int, label: str) -> Optional[_HttpChannel]:
+        if not CF_H2_AVAILABLE:
+            return None
         if self.closed:
             raise ConnectionError('H2 pool closed')
         if time.monotonic() < self.setup_retry_after.get(dc, 0):
@@ -900,7 +909,7 @@ class CfH2Pool:
                     lane = _HttpLane(host, self.next_lane)
                     try:
                         await lane._preflight()
-                    except (httpx.HTTPError, OSError, ValueError) as exc:
+                    except _HTTPX_ERRORS + (OSError, ValueError) as exc:
                         stats.h2_errors += 1
                         self.failed_until[host] = time.monotonic() + DOMAIN_COOLDOWN
                         log.warning('[%s] H2 lane=%d preflight failed host=%s: %s: %s',
@@ -990,7 +999,7 @@ async def bridge_h2(reader, writer, channel: _HttpChannel, ctx, tag: bytes) -> N
         log.debug('[%s] H2 channel=%d native EOF', channel.label, channel.channel_id)
     except _NativeDeliveryError as exc:
         log.debug('[%s] H2 channel=%d native closed: %s', channel.label, channel.channel_id, exc)
-    except (httpx.HTTPError, OSError, ValueError, BufferError, asyncio.TimeoutError) as exc:
+    except _HTTPX_ERRORS + (OSError, ValueError, BufferError, asyncio.TimeoutError) as exc:
         if not channel.closed:
             log.warning('[%s] H2 channel=%d bridge ended: %s: %s',
                         channel.label, channel.channel_id, type(exc).__name__, exc)

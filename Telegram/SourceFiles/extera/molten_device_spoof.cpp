@@ -26,6 +26,10 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/wrap/vertical_layout.h"
 #include "window/window_session_controller.h"
 
+#include <QtCore/QCoreApplication>
+#include <QtCore/QMutex>
+#include <QtCore/QThread>
+
 namespace Extera::DeviceSpoof {
 namespace {
 
@@ -36,6 +40,26 @@ const auto kKeyCustomSysVer = u"spoof_custom_sys_ver"_q;
 const auto kKeyCustomAppVer = u"spoof_custom_app_ver"_q;
 
 const auto kDefaultPresetId = u"moltenstar"_q;
+
+struct SpoofSnapshot {
+	bool initialized = false;
+	bool enabled = false;
+	Preset preset;
+};
+
+QMutex &SnapshotMutex() {
+	static QMutex mutex;
+	return mutex;
+}
+
+SpoofSnapshot &Snapshot() {
+	static SpoofSnapshot snapshot;
+	return snapshot;
+}
+
+[[nodiscard]] bool OnMainThread() {
+	return !qApp || (QThread::currentThread() == qApp->thread());
+}
 
 const std::vector<Preset> &PresetsList() {
 	static const auto kList = std::vector<Preset>{
@@ -758,6 +782,61 @@ const std::vector<Preset> &PresetsList() {
 	return kList;
 }
 
+void RefreshSnapshotOnMain();
+
+void EnsureConfigListenerOnMain() {
+	if (!OnMainThread()) {
+		return;
+	}
+	static auto hooked = false;
+	if (hooked) {
+		return;
+	}
+	hooked = true;
+	Config::Instance().changes(
+	) | rpl::on_next([](const QString &key) {
+		if (key.startsWith(u"spoof_"_q)) {
+			RefreshSnapshotOnMain();
+		}
+	}, *(new rpl::lifetime()));
+}
+
+void RefreshSnapshotOnMain() {
+	if (!OnMainThread()) {
+		return;
+	}
+	EnsureConfigListenerOnMain();
+	const auto enabled = Config::Instance().boolValue(kKeyEnabled);
+	const auto val = Config::Instance().stringValue(kKeyPreset);
+	const auto id = val.isEmpty() ? kDefaultPresetId : val;
+	auto active = PresetsList().front();
+	if (const auto preset = FindPreset(id)) {
+		if (preset->isCustom) {
+			active = *preset;
+			const auto m = Config::Instance().stringValue(kKeyCustomModel);
+			const auto s = Config::Instance().stringValue(kKeyCustomSysVer);
+			const auto a = Config::Instance().stringValue(kKeyCustomAppVer);
+			if (!m.isEmpty()) active.deviceModel = m;
+			if (!s.isEmpty()) active.systemVersion = s;
+			if (!a.isEmpty()) active.appVersion = a;
+		} else {
+			active = *preset;
+		}
+	}
+	QMutexLocker lock(&SnapshotMutex());
+	Snapshot().enabled = enabled;
+	Snapshot().preset = std::move(active);
+	Snapshot().initialized = true;
+}
+
+[[nodiscard]] SpoofSnapshot ReadSnapshot() {
+	if (OnMainThread()) {
+		RefreshSnapshotOnMain();
+	}
+	QMutexLocker lock(&SnapshotMutex());
+	return Snapshot();
+}
+
 } // namespace
 
 QString Preset::formattedSummary() const {
@@ -765,12 +844,19 @@ QString Preset::formattedSummary() const {
 }
 
 bool Enabled() {
-	return Config::Instance().boolValue(kKeyEnabled);
+	if (OnMainThread()) {
+		RefreshSnapshotOnMain();
+		QMutexLocker lock(&SnapshotMutex());
+		return Snapshot().enabled;
+	}
+	QMutexLocker lock(&SnapshotMutex());
+	return Snapshot().initialized ? Snapshot().enabled : false;
 }
 
 void SetEnabled(bool enabled) {
 	Config::Instance().setBool(kKeyEnabled, enabled);
 	Config::Instance().saveNow();
+	RefreshSnapshotOnMain();
 }
 
 QString SelectedPresetId() {
@@ -781,24 +867,17 @@ QString SelectedPresetId() {
 void SetSelectedPresetId(const QString &id) {
 	Config::Instance().setString(kKeyPreset, id);
 	Config::Instance().saveNow();
+	RefreshSnapshotOnMain();
 }
 
 Preset ActivePreset() {
-	const auto id = SelectedPresetId();
-	if (const auto preset = FindPreset(id)) {
-		if (preset->isCustom) {
-			auto custom = *preset;
-			const auto m = CustomDeviceModel();
-			const auto s = CustomSystemVersion();
-			const auto a = CustomAppVersion();
-			if (!m.isEmpty()) custom.deviceModel = m;
-			if (!s.isEmpty()) custom.systemVersion = s;
-			if (!a.isEmpty()) custom.appVersion = a;
-			return custom;
-		}
-		return *preset;
+	if (OnMainThread()) {
+		RefreshSnapshotOnMain();
+		QMutexLocker lock(&SnapshotMutex());
+		return Snapshot().preset;
 	}
-	return PresetsList().front();
+	QMutexLocker lock(&SnapshotMutex());
+	return Snapshot().initialized ? Snapshot().preset : PresetsList().front();
 }
 
 const std::vector<Preset> &AllPresets() {
@@ -826,6 +905,7 @@ QString CustomDeviceModel() {
 void SetCustomDeviceModel(const QString &model) {
 	Config::Instance().setString(kKeyCustomModel, model);
 	Config::Instance().saveNow();
+	RefreshSnapshotOnMain();
 }
 
 QString CustomSystemVersion() {
@@ -835,6 +915,7 @@ QString CustomSystemVersion() {
 void SetCustomSystemVersion(const QString &sysVer) {
 	Config::Instance().setString(kKeyCustomSysVer, sysVer);
 	Config::Instance().saveNow();
+	RefreshSnapshotOnMain();
 }
 
 QString CustomAppVersion() {
@@ -844,56 +925,57 @@ QString CustomAppVersion() {
 void SetCustomAppVersion(const QString &appVer) {
 	Config::Instance().setString(kKeyCustomAppVer, appVer);
 	Config::Instance().saveNow();
+	RefreshSnapshotOnMain();
 }
 
 QString ApplyDeviceModel(const QString &original) {
-	if (!Enabled()) {
+	const auto s = ReadSnapshot();
+	if (!s.initialized || !s.enabled) {
 		return original;
 	}
-	const auto preset = ActivePreset();
-	return preset.deviceModel.isEmpty() ? original : preset.deviceModel;
+	return s.preset.deviceModel.isEmpty() ? original : s.preset.deviceModel;
 }
 
 QString ApplySystemVersion(const QString &original) {
-	if (!Enabled()) {
+	const auto s = ReadSnapshot();
+	if (!s.initialized || !s.enabled) {
 		return original;
 	}
-	const auto preset = ActivePreset();
-	return preset.systemVersion.isEmpty() ? original : preset.systemVersion;
+	return s.preset.systemVersion.isEmpty() ? original : s.preset.systemVersion;
 }
 
 QString ApplyAppVersion(const QString &original) {
-	if (!Enabled()) {
+	const auto s = ReadSnapshot();
+	if (!s.initialized || !s.enabled) {
 		return original;
 	}
-	const auto preset = ActivePreset();
-	return preset.appVersion.isEmpty() ? original : preset.appVersion;
+	return s.preset.appVersion.isEmpty() ? original : s.preset.appVersion;
 }
 
 QString ApplyPlatform(const QString &original) {
-	if (!Enabled()) {
+	const auto s = ReadSnapshot();
+	if (!s.initialized || !s.enabled) {
 		return original;
 	}
-	const auto preset = ActivePreset();
-	return preset.platform.isEmpty() ? original : preset.platform;
+	return s.preset.platform.isEmpty() ? original : s.preset.platform;
 }
 
 void ApplyConnectionParameters(
 		QString &deviceModel,
 		QString &systemVersion,
 		QString &appVersion) {
-	if (!Enabled()) {
+	const auto s = ReadSnapshot();
+	if (!s.initialized || !s.enabled) {
 		return;
 	}
-	const auto preset = ActivePreset();
-	if (!preset.deviceModel.isEmpty()) {
-		deviceModel = preset.deviceModel;
+	if (!s.preset.deviceModel.isEmpty()) {
+		deviceModel = s.preset.deviceModel;
 	}
-	if (!preset.systemVersion.isEmpty()) {
-		systemVersion = preset.systemVersion;
+	if (!s.preset.systemVersion.isEmpty()) {
+		systemVersion = s.preset.systemVersion;
 	}
-	if (!preset.appVersion.isEmpty()) {
-		appVersion = preset.appVersion;
+	if (!s.preset.appVersion.isEmpty()) {
+		appVersion = s.preset.appVersion;
 	}
 }
 

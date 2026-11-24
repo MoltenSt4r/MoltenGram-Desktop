@@ -320,16 +320,22 @@ void ShowSettingsBox(not_null<Window::SessionController*> controller) {
 		const auto listWrap = box->verticalLayout()->add(
 			object_ptr<Ui::VerticalLayout>(box));
 
-		const auto rebuild = std::make_shared<Fn<void()>>();
+		const auto weakBox = base::make_weak(box.get());
+		const auto weakList = QPointer<Ui::VerticalLayout>(listWrap);
+		const auto weakController = base::make_weak(controller);
+		const auto rebuild = box->lifetime().make_state<Fn<void()>>();
 		*rebuild = [=] {
-			while (listWrap->count() > 0) {
-				delete listWrap->widgetAt(0);
+			if (!weakBox || !weakList) {
+				return;
+			}
+			while (weakList->count() > 0) {
+				delete weakList->widgetAt(0);
 			}
 			const auto commands = List();
 			if (commands.empty()) {
-				listWrap->add(
+				weakList->add(
 					object_ptr<Ui::FlatLabel>(
-						listWrap,
+						weakList,
 						rpl::single(u"No custom commands yet. Add commands like .id or .tagall for instant autocomplete."_q),
 						st::boxDividerLabel),
 					st::boxRowPadding);
@@ -339,22 +345,33 @@ void ShowSettingsBox(not_null<Window::SessionController*> controller) {
 					const auto label = cmd.description.isEmpty()
 						? cmd.fullCommand()
 						: (cmd.fullCommand() + u" — "_q + cmd.description);
-					const auto btn = listWrap->add(
+					const auto btn = weakList->add(
 						object_ptr<Ui::SettingsButton>(
-							listWrap,
+							weakList,
 							rpl::single(label),
 							st::settingsButtonNoIcon));
+					const auto safeRebuild = crl::guard(weakBox, [=] {
+						if (*rebuild) {
+							(*rebuild)();
+						}
+					});
 					btn->setClickedCallback([=] {
-						controller->show(Box([=](not_null<Ui::GenericBox*> actionBox) {
+						const auto strongController = weakController.get();
+						if (!strongController) {
+							return;
+						}
+						strongController->show(Box([=](not_null<Ui::GenericBox*> actionBox) {
 							actionBox->setTitle(rpl::single(cmd.fullCommand()));
 							actionBox->addButton(rpl::single(u"Edit"_q), [=] {
 								actionBox->closeBox();
-								ShowEditCommandBox(controller, i, *rebuild);
+								if (const auto c = weakController.get()) {
+									ShowEditCommandBox(c, i, safeRebuild);
+								}
 							});
 							actionBox->addButton(tr::lng_box_delete(), [=] {
 								actionBox->closeBox();
 								Remove(i);
-								(*rebuild)();
+								safeRebuild();
 							}, st::attentionBoxButton);
 							actionBox->addLeftButton(tr::lng_cancel(), [=] {
 								actionBox->closeBox();
@@ -363,15 +380,26 @@ void ShowSettingsBox(not_null<Window::SessionController*> controller) {
 					});
 				}
 			}
-			listWrap->resizeToWidth(box->width());
+			weakList->resizeToWidth(weakBox->width());
 		};
 		(*rebuild)();
 
+		const auto safeRebuild = crl::guard(weakBox, [=] {
+			if (*rebuild) {
+				(*rebuild)();
+			}
+		});
 		box->addButton(rpl::single(u"Add command"_q), [=] {
-			ShowEditCommandBox(controller, -1, *rebuild);
+			if (const auto c = weakController.get()) {
+				ShowEditCommandBox(c, -1, safeRebuild);
+			}
 		});
 		box->addButton(rpl::single(u"Templates"_q), [=] {
-			controller->show(Box([=](not_null<Ui::GenericBox*> tmplBox) {
+			const auto strongController = weakController.get();
+			if (!strongController) {
+				return;
+			}
+			strongController->show(Box([=](not_null<Ui::GenericBox*> tmplBox) {
 				tmplBox->setTitle(rpl::single(u"Select Command Template"_q));
 				for (const auto &tmpl : PresetTemplates()) {
 					const auto text = tmpl.fullCommand() + u" — "_q + tmpl.description;
@@ -383,8 +411,10 @@ void ShowSettingsBox(not_null<Window::SessionController*> controller) {
 					btn->setClickedCallback([=] {
 						Add(tmpl);
 						tmplBox->closeBox();
-						(*rebuild)();
-						controller->showToast(u"Added template: "_q + tmpl.fullCommand());
+						safeRebuild();
+						if (const auto c = weakController.get()) {
+							c->showToast(u"Added template: "_q + tmpl.fullCommand());
+						}
 					});
 				}
 				tmplBox->addButton(tr::lng_cancel(), [=] { tmplBox->closeBox(); });

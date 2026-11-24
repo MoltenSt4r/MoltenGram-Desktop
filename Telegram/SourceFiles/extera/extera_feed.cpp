@@ -1349,14 +1349,15 @@ void ShowCategoryBox(
 				return QString::number(list.size());
 			}),
 			st::settingsButtonNoIcon);
+		const auto weakBox = base::make_weak(box.get());
 		channelsButton->setClickedCallback([=] {
 			ShowChannelsPicker(
 				controller,
 				tr::lng_exd_feed_category_channels(),
 				selected->current(),
-				[=](base::flat_set<uint64> result) {
+				crl::guard(weakBox, [=](base::flat_set<uint64> result) {
 					*selected = std::move(result);
-				});
+				}));
 		});
 		Ui::AddSkip(content);
 		box->setFocusCallback([=] { name->setFocusFast(); });
@@ -1388,7 +1389,7 @@ void ShowCategoryBox(
 		if (exists) {
 			box->addLeftButton(tr::lng_box_delete(), [=] {
 				auto updated = Categories();
-				if (index < int(updated.size())) {
+				if (index >= 0 && index < int(updated.size())) {
 					updated.erase(begin(updated) + index);
 				}
 				if (Int(u"feed_category"_q) - 1 >= index) {
@@ -1458,9 +1459,15 @@ void ShowFeedSettings(not_null<Window::SessionController*> controller) {
 			tr::lng_extera_feed_archived());
 		Ui::AddDividerText(content, tr::lng_extera_feed_archived_about());
 		Ui::AddSubsectionTitle(content, tr::lng_exd_feed_categories());
+		const auto weakBox = base::make_weak(box.get());
+		const auto weakController = base::make_weak(controller);
 		const auto reopen = [=] {
-			box->closeBox();
-			ShowFeedSettings(controller);
+			if (weakBox) {
+				weakBox->closeBox();
+			}
+			if (const auto strong = weakController.get()) {
+				ShowFeedSettings(strong);
+			}
 		};
 		const auto categories = Categories();
 		for (auto i = 0; i != int(categories.size()); ++i) {
@@ -1482,9 +1489,10 @@ void ShowFeedSettings(not_null<Window::SessionController*> controller) {
 			ShowCategoryBox(controller, -1, reopen);
 		});
 		Ui::AddDividerText(content, tr::lng_exd_feed_categories_about());
+		const auto weakOwner = base::make_weak(owner);
 		const auto shownCount = [=] {
 			const auto hidden = HiddenChannels();
-			const auto all = AllChannels(owner);
+			const auto all = weakOwner ? AllChannels(weakOwner.get()) : std::vector<not_null<History*>>();
 			const auto shown = ranges::count_if(all, [&](auto history) {
 				return !hidden.contains(history->peer->id.value);
 			});
@@ -1503,9 +1511,13 @@ void ShowFeedSettings(not_null<Window::SessionController*> controller) {
 			shownLabel->value(),
 			st::settingsButtonNoIcon);
 		shownButton->setClickedCallback([=] {
+			const auto strongOwner = weakOwner.get();
+			if (!strongOwner) {
+				return;
+			}
 			const auto hidden = HiddenChannels();
 			auto selected = base::flat_set<uint64>();
-			for (const auto history : AllChannels(owner)) {
+			for (const auto history : AllChannels(strongOwner)) {
 				const auto id = history->peer->id.value;
 				if (!hidden.contains(id)) {
 					selected.emplace(id);
@@ -1515,14 +1527,18 @@ void ShowFeedSettings(not_null<Window::SessionController*> controller) {
 				controller,
 				tr::lng_extera_feed_shown(),
 				std::move(selected),
-				[=](base::flat_set<uint64> result) {
-					for (const auto history : AllChannels(owner)) {
+				crl::guard(weakBox, [=](base::flat_set<uint64> result) {
+					const auto currentOwner = weakOwner.get();
+					if (!currentOwner) {
+						return;
+					}
+					for (const auto history : AllChannels(currentOwner)) {
 						SetChannelHidden(
 							history->peer,
 							!result.contains(history->peer->id.value));
 					}
 					*shownLabel = shownCount();
-				});
+				}));
 		});
 		Ui::AddDividerText(content, tr::lng_extera_feed_channels_about());
 		box->addButton(tr::lng_close(), [=] { box->closeBox(); });

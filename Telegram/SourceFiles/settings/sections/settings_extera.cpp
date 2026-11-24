@@ -226,6 +226,9 @@ void AddChoice(
 		.icon = { icon },
 		.label = Config().intChanges(key) | rpl::map(optionText),
 		.onClick = [=] {
+			if (!controller) {
+				return;
+			}
 			auto texts = std::vector<QString>();
 			for (auto i = 0; i != int(options.size()); ++i) {
 				texts.push_back(optionText(i));
@@ -293,6 +296,9 @@ void AddValueChoice(
 		.st = &st::settingsButtonNoIcon,
 		.label = Config().intChanges(key) | rpl::map(text),
 		.onClick = [=] {
+			if (!controller) {
+				return;
+			}
 			auto texts = std::vector<QString>();
 			auto selected = 0;
 			const auto current = Extera::Int(key);
@@ -308,7 +314,9 @@ void AddValueChoice(
 					.options = texts,
 					.initialSelection = selected,
 					.callback = [=](int index) {
-						Config().setInt(key, values[index]);
+						if (index >= 0 && index < int(values.size())) {
+							Config().setInt(key, values[index]);
+						}
 					},
 				});
 			}));
@@ -1229,13 +1237,12 @@ void ShowAppIconBox(not_null<Window::SessionController*> controller) {
 			const auto index = state->selected;
 			const auto changed = (index != current)
 				|| (state->square != currentSquare);
-			box->closeBox();
-			if (!changed) {
-				return;
+			if (changed) {
+				Config().setString(u"app_icon"_q, variants[index].id);
+				Config().setBool(u"app_icon_square"_q, state->square);
+				Extera::AppIcon::Apply();
 			}
-			Config().setString(u"app_icon"_q, variants[index].id);
-			Config().setBool(u"app_icon_square"_q, state->square);
-			Extera::AppIcon::Apply();
+			box->closeBox();
 		});
 		box->addButton(tr::lng_cancel(), [=] { box->closeBox(); });
 	}));
@@ -1283,6 +1290,7 @@ void ShowQuickActionsBox(not_null<Window::SessionController*> controller) {
 				order.push_back(id);
 			}
 		}
+		const auto weak = base::make_weak(controller);
 		const auto state = box->lifetime().make_state<QStringList>(chosen);
 		const auto list = box->addRow(
 			object_ptr<Ui::VerticalLayout>(box),
@@ -1291,10 +1299,12 @@ void ShowQuickActionsBox(not_null<Window::SessionController*> controller) {
 		const auto save = [=] {
 			auto result = QStringList();
 			for (auto i = 0; i != list->count(); ++i) {
-				const auto id = list->widgetAt(i)->property(
-					"extera_quick_id").toString();
-				if (state->contains(id)) {
-					result.push_back(id);
+				if (const auto w = list->widgetAt(i)) {
+					const auto id = w->property(
+						"extera_quick_id").toString();
+					if (state->contains(id)) {
+						result.push_back(id);
+					}
 				}
 			}
 			*state = result;
@@ -1321,8 +1331,10 @@ void ShowQuickActionsBox(not_null<Window::SessionController*> controller) {
 			) | rpl::skip(1) | rpl::on_next([=](bool on) {
 				if (on && !state->contains(id)) {
 					if (state->size() >= kLimit) {
-						controller->showToast(
-							tr::lng_extera_quick_actions_limit(tr::now));
+						if (const auto strong = weak.get()) {
+							strong->showToast(
+								tr::lng_extera_quick_actions_limit(tr::now));
+						}
 						crl::on_main(button, [=] {
 							forced->fire(false);
 						});
@@ -1662,6 +1674,9 @@ void PartGeneral2(SectionBuilder &builder) {
 					: Ui::LanguageName(id);
 			}),
 			.onClick = [=] {
+				if (!controller) {
+					return;
+				}
 				controller->show(Box([=](not_null<Ui::GenericBox*> box) {
 					const auto &core = Core::App().settings();
 					auto selected = std::vector<LanguageId>{
@@ -1676,6 +1691,9 @@ void PartGeneral2(SectionBuilder &builder) {
 						box,
 						tr::lng_languages(),
 						[=](const std::vector<LanguageId> &ids) {
+							if (ids.empty()) {
+								return;
+							}
 							Config().setBool(
 								u"translate_follow_app"_q,
 								false);
@@ -1718,7 +1736,9 @@ void PartGeneral2(SectionBuilder &builder) {
 				return names.join(u", "_q);
 			}),
 			.onClick = [=] {
-				controller->show(Ui::EditSkipTranslationLanguages());
+				if (controller) {
+					controller->show(Ui::EditSkipTranslationLanguages());
+				}
 			},
 		});
 	});
@@ -1792,7 +1812,9 @@ void PartGeneral5(SectionBuilder &builder) {
 			.title = tr::lng_extera_save_folder(),
 			.st = &st::settingsButtonNoIcon,
 			.onClick = [=] {
-				controller->show(Box<DownloadPathBox>(controller));
+				if (controller) {
+					controller->show(Box<DownloadPathBox>(controller));
+				}
 			},
 		});
 	});
@@ -1849,6 +1871,7 @@ void PartGeneral6(SectionBuilder &builder) {
 
 void PartGeneralProfile(SectionBuilder &builder) {
 	[[maybe_unused]] const auto controller = builder.controller();
+	const auto session = builder.session();
 	builder.addSkip();
 	builder.addSubsectionTitle(rpl::single(u"MoltenGram Profile & Companion"_q));
 	builder.card([&] {
@@ -1857,7 +1880,9 @@ void PartGeneralProfile(SectionBuilder &builder) {
 			.title = rpl::single(u"Profile Styling & Free Emoji Status"_q),
 			.st = &st::settingsButtonNoIcon,
 			.onClick = [=] {
-				Extera::MoltenBotSync::ShowProfileStylingBox(controller);
+				if (controller) {
+					Extera::MoltenBotSync::ShowProfileStylingBox(controller);
+				}
 			},
 			.keywords = { u"molten"_q, u"profile"_q, u"emoji"_q, u"status"_q, u"bot"_q },
 		});
@@ -1883,7 +1908,7 @@ void PartGeneralProfile(SectionBuilder &builder) {
 				return (value != Extera::Bool(u"molten_bot_profile_sync"_q));
 			}) | rpl::on_next([=](bool value) {
 				Config().setBool(u"molten_bot_profile_sync"_q, value);
-				Extera::MoltenProfile::ResyncSelfMetadata(&controller->session());
+				Extera::MoltenProfile::ResyncSelfMetadata(session);
 			}, botSync->lifetime());
 		}
 		AddToggle(
@@ -1904,7 +1929,9 @@ void PartGeneralDevice(SectionBuilder &builder) {
 			.title = rpl::single(u"Device & Session Spoofing"_q),
 			.st = &st::settingsButtonNoIcon,
 			.onClick = [=] {
-				Extera::DeviceSpoof::ShowSettingsBox(controller);
+				if (controller) {
+					Extera::DeviceSpoof::ShowSettingsBox(controller);
+				}
 			},
 			.keywords = { u"device"_q, u"spoof"_q, u"session"_q, u"model"_q, u"android"_q, u"ios"_q },
 		});
@@ -1994,7 +2021,9 @@ void PartChatsGestures(SectionBuilder &builder) {
 				: rpl::single(u"Configure Gestures & Preserved Quotes"_q),
 			.st = &st::settingsButtonNoIcon,
 			.onClick = [=] {
-				Extera::ChatExtras::ShowSettingsBox(controller);
+				if (controller) {
+					Extera::ChatExtras::ShowSettingsBox(controller);
+				}
 			},
 			.keywords = { u"doubletap"_q, u"reply"_q, u"quotes"_q, u"reaction"_q, u"translate"_q, u"copy"_q, u"save"_q },
 		});
@@ -2053,7 +2082,9 @@ void PartChatsCustomCommands(SectionBuilder &builder) {
 				: rpl::single(u"Manage Custom Commands & Templates"_q),
 			.st = &st::settingsButtonNoIcon,
 			.onClick = [=] {
-				Extera::MoltenCommands::ShowSettingsBox(controller);
+				if (controller) {
+					Extera::MoltenCommands::ShowSettingsBox(controller);
+				}
 			},
 			.keywords = { u"molten"_q, u"commands"_q, u"autocomplete"_q, u"template"_q },
 		});
@@ -2099,7 +2130,9 @@ void PartChatsMediaAudio(SectionBuilder &builder) {
 				: rpl::single(u"My Local Playlists"_q),
 			.st = &st::settingsButtonNoIcon,
 			.onClick = [=] {
-				Extera::Playlists::ShowPlaylistsBox(controller);
+				if (controller) {
+					Extera::Playlists::ShowPlaylistsBox(controller);
+				}
 			},
 			.keywords = { u"molten"_q, u"playlist"_q, u"music"_q, u"audio"_q, u"m3u8"_q },
 		});
@@ -2138,7 +2171,9 @@ void PartChatsVoiceChanger(SectionBuilder &builder) {
 				: rpl::single(u"Voice Effect Presets & Pitch Settings"_q),
 			.st = &st::settingsButtonNoIcon,
 			.onClick = [=] {
-				Extera::VoiceChanger::ShowSettingsBox(controller);
+				if (controller) {
+					Extera::VoiceChanger::ShowSettingsBox(controller);
+				}
 			},
 			.keywords = { u"voice"_q, u"changer"_q, u"pitch"_q, u"robot"_q, u"echo"_q, u"chipmunk"_q, u"bass"_q },
 		});
@@ -2177,7 +2212,9 @@ void PartChatsSongRec(SectionBuilder &builder) {
 				: rpl::single(u"Recognition Provider & AudD Settings"_q),
 			.st = &st::settingsButtonNoIcon,
 			.onClick = [=] {
-				Extera::SongRec::ShowSettingsBox(controller);
+				if (controller) {
+					Extera::SongRec::ShowSettingsBox(controller);
+				}
 			},
 			.keywords = { u"songrec"_q, u"shazam"_q, u"audd"_q, u"token"_q },
 		});
@@ -2206,7 +2243,9 @@ void PartPillStack(SectionBuilder &builder) {
 			.title = rpl::single(u"PillStack Badges Setup & Customization"_q),
 			.st = &st::settingsButtonNoIcon,
 			.onClick = [=] {
-				Extera::PillStack::ShowSettingsBox(controller);
+				if (controller) {
+					Extera::PillStack::ShowSettingsBox(controller);
+				}
 			},
 			.keywords = { u"molten"_q, u"pill"_q, u"stack"_q, u"ping"_q, u"weather"_q, u"rates"_q, u"ram"_q, u"speed"_q },
 		});
@@ -2292,7 +2331,9 @@ void PartOtherMedia(SectionBuilder &builder) {
 			.title = rpl::single(u"My Local Playlists"_q),
 			.st = &st::settingsButtonNoIcon,
 			.onClick = [=] {
-				Extera::Playlists::ShowPlaylistsBox(controller);
+				if (controller) {
+					Extera::Playlists::ShowPlaylistsBox(controller);
+				}
 			},
 			.keywords = { u"molten"_q, u"playlist"_q, u"music"_q, u"audio"_q },
 		});
@@ -2301,7 +2342,9 @@ void PartOtherMedia(SectionBuilder &builder) {
 			.title = rpl::single(u"NowPlaying & Last.fm Status"_q),
 			.st = &st::settingsButtonNoIcon,
 			.onClick = [=] {
-				Extera::NowPlaying::ShowSettingsBox(controller);
+				if (controller) {
+					Extera::NowPlaying::ShowSettingsBox(controller);
+				}
 			},
 			.keywords = { u"nowplaying"_q, u"music"_q, u"lastfm"_q, u"bio"_q, u"status"_q },
 		});
@@ -2310,7 +2353,9 @@ void PartOtherMedia(SectionBuilder &builder) {
 			.title = rpl::single(u"Music Recognition (SongRec / AudD)"_q),
 			.st = &st::settingsButtonNoIcon,
 			.onClick = [=] {
-				Extera::SongRec::ShowSettingsBox(controller);
+				if (controller) {
+					Extera::SongRec::ShowSettingsBox(controller);
+				}
 			},
 			.keywords = { u"songrec"_q, u"shazam"_q, u"audd"_q, u"music"_q, u"recognition"_q },
 		});
@@ -2319,7 +2364,9 @@ void PartOtherMedia(SectionBuilder &builder) {
 			.title = rpl::single(u"Voice Changer & Pitch Shifter"_q),
 			.st = &st::settingsButtonNoIcon,
 			.onClick = [=] {
-				Extera::VoiceChanger::ShowSettingsBox(controller);
+				if (controller) {
+					Extera::VoiceChanger::ShowSettingsBox(controller);
+				}
 			},
 			.keywords = { u"voice"_q, u"changer"_q, u"pitch"_q, u"robot"_q, u"echo"_q },
 		});
@@ -2328,7 +2375,9 @@ void PartOtherMedia(SectionBuilder &builder) {
 			.title = rpl::single(u"Custom MD3 QR Code"_q),
 			.st = &st::settingsButtonNoIcon,
 			.onClick = [=] {
-				Extera::QrGenerator::ShowQrShareBox(controller, QString());
+				if (controller) {
+					Extera::QrGenerator::ShowQrShareBox(controller, QString());
+				}
 			},
 			.keywords = { u"molten"_q, u"qr"_q, u"code"_q, u"share"_q, u"card"_q },
 		});
@@ -2344,7 +2393,11 @@ void PartAppearance0(SectionBuilder &builder) {
 			.id = u"extera/md3"_q,
 			.title = tr::lng_exd_md3_title(),
 			.icon = { &st::exteraIconAppearance },
-			.onClick = [=] { Extera::Md3::ShowSettingsBox(controller); },
+			.onClick = [=] {
+				if (controller) {
+					Extera::Md3::ShowSettingsBox(controller);
+				}
+			},
 			.keywords = { u"material"_q, u"md3"_q, u"design"_q },
 		});
 		AddToggle(
@@ -2457,13 +2510,21 @@ void PartAppearance3(SectionBuilder &builder) {
 			.id = u"extera/app_icon"_q,
 			.title = tr::lng_extera_app_icon(),
 			.icon = { &st::exteraIconAppearance },
-			.onClick = [=] { ShowAppIconBox(controller); },
+			.onClick = [=] {
+				if (controller) {
+					ShowAppIconBox(controller);
+				}
+			},
 		});
 		builder.addButton({
 			.id = u"extera/icon_packs"_q,
 			.title = tr::lng_exd_icon_packs(),
 			.icon = { &st::exteraIconAppearance },
-			.onClick = [=] { Extera::Md3::ShowIconPacksBox(controller); },
+			.onClick = [=] {
+				if (controller) {
+					Extera::Md3::ShowIconPacksBox(controller);
+				}
+			},
 		});
 	});
 	AddAbout(builder, tr::lng_exd_icon_packs_about());
@@ -2485,7 +2546,9 @@ void PartAppearance4(SectionBuilder &builder) {
 			.title = tr::lng_exd_monet_color(),
 			.st = &st::settingsButtonNoIcon,
 			.onClick = [=] {
-				Extera::Md3::ShowMonetColorBox(controller);
+				if (controller) {
+					Extera::Md3::ShowMonetColorBox(controller);
+				}
 			},
 			.keywords = { u"monet"_q, u"accent"_q, u"color"_q, u"palette"_q },
 		});
@@ -2509,7 +2572,9 @@ void PartAppearance4(SectionBuilder &builder) {
 			.title = rpl::single(u"MD3 Expressive Avatar Shapes (44 shapes)"_q),
 			.st = &st::settingsButtonNoIcon,
 			.onClick = [=] {
-				Extera::AvatarShapes::ShowSettingsBox(controller);
+				if (controller) {
+					Extera::AvatarShapes::ShowSettingsBox(controller);
+				}
 			},
 			.keywords = { u"molten"_q, u"avatar"_q, u"shape"_q, u"md3"_q },
 		});
@@ -2523,7 +2588,9 @@ void PartAppearance4(SectionBuilder &builder) {
 			.title = rpl::single(u"Frosted / Liquid Glass Bubbles"_q),
 			.st = &st::settingsButtonNoIcon,
 			.onClick = [=] {
-				Extera::GlassBubbles::ShowSettingsBox(controller);
+				if (controller) {
+					Extera::GlassBubbles::ShowSettingsBox(controller);
+				}
 			},
 			.keywords = { u"molten"_q, u"glass"_q, u"bubble"_q, u"frosted"_q },
 		});
@@ -2565,11 +2632,13 @@ void PartAppearance4(SectionBuilder &builder) {
 					? style::SystemFontTag()
 					: QString());
 				Core::App().saveSettings();
-				controller->show(Ui::MakeConfirmBox({
-					.text = tr::lng_extera_restart_required(),
-					.confirmed = [] { Core::Restart(); },
-					.confirmText = tr::lng_extera_restart(),
-				}));
+				if (controller) {
+					controller->show(Ui::MakeConfirmBox({
+						.text = tr::lng_extera_restart_required(),
+						.confirmed = [] { Core::Restart(); },
+						.confirmText = tr::lng_extera_restart(),
+					}));
+				}
 			});
 		AddToggle(
 			builder,
@@ -2710,7 +2779,11 @@ void PartChats2(SectionBuilder &builder) {
 					? u"@gif"_q
 					: (u"@"_q + bot.trimmed());
 			}),
-			.onClick = [=] { ShowGifBotBox(gifController); },
+			.onClick = [=] {
+				if (gifController) {
+					ShowGifBotBox(gifController);
+				}
+			},
 			.keywords = { u"gif"_q },
 		});
 		AddToggle(
@@ -2954,7 +3027,11 @@ void PartChats5(SectionBuilder &builder) {
 			.id = u"extera/menu_quick_items"_q,
 			.title = tr::lng_extera_quick_actions_buttons(),
 			.st = &st::settingsButtonNoIcon,
-			.onClick = [=] { ShowQuickActionsBox(controller); },
+			.onClick = [=] {
+				if (controller) {
+					ShowQuickActionsBox(controller);
+				}
+			},
 			.keywords = { u"menu"_q },
 		});
 	});
@@ -3301,11 +3378,13 @@ void PartPlugins0(SectionBuilder &builder) {
 				return value != Extera::Bool(u"plugins_enabled"_q);
 			}) | rpl::on_next([=](bool value) {
 				Config().setBool(u"plugins_enabled"_q, value);
-				controller->show(Ui::MakeConfirmBox({
-					.text = tr::lng_extera_restart_required(),
-					.confirmed = [] { Core::Restart(); },
-					.confirmText = tr::lng_extera_restart(),
-				}));
+				if (controller) {
+					controller->show(Ui::MakeConfirmBox({
+						.text = tr::lng_extera_restart_required(),
+						.confirmed = [] { Core::Restart(); },
+						.confirmText = tr::lng_extera_restart(),
+					}));
+				}
 			}, engine->lifetime());
 		}
 		builder.addSectionButton({
@@ -3318,6 +3397,9 @@ void PartPlugins0(SectionBuilder &builder) {
 			.title = tr::lng_extera_plugins_install_file(),
 			.icon = { &st::menuIconDownload },
 			.onClick = [=] {
+				if (!controller) {
+					return;
+				}
 				if (Extera::Plugins::Started()) {
 					Extera::Plugins::ChooseAndInstall(controller);
 				} else {
@@ -3363,7 +3445,11 @@ void PartOther0(SectionBuilder &builder) {
 			.id = u"extera/badge_buy"_q,
 			.title = tr::lng_exd_badge_get(),
 			.icon = { &st::menuIconPremium },
-			.onClick = [=] { ShowBadgeInfoBox(controller); },
+			.onClick = [=] {
+				if (controller) {
+					ShowBadgeInfoBox(controller);
+				}
+			},
 			.keywords = { u"badge"_q, u"verified"_q },
 		});
 	});
@@ -3402,7 +3488,9 @@ void PartOther2(SectionBuilder &builder) {
 			.title = tr::lng_extera_check_updates(),
 			.icon = { &st::menuIconRestore },
 			.onClick = [=] {
-				Exd::ShowUpdateBox(controller);
+				if (controller) {
+					Exd::ShowUpdateBox(controller);
+				}
 			},
 			.keywords = { u"update"_q, u"version"_q },
 		});
@@ -3412,8 +3500,10 @@ void PartOther2(SectionBuilder &builder) {
 			.icon = { &st::menuIconRestore },
 			.onClick = [=] {
 				Extera::RefreshBadges();
-				controller->showToast(
-					tr::lng_exd_refresh_badges_done(tr::now));
+				if (controller) {
+					controller->showToast(
+						tr::lng_exd_refresh_badges_done(tr::now));
+				}
 			},
 			.keywords = { u"badges"_q, u"refresh"_q },
 		});
@@ -3452,6 +3542,7 @@ void PartOther3(SectionBuilder &builder) {
 			.title = tr::lng_extera_export(),
 			.icon = { &st::exteraIconExport },
 			.onClick = [=] {
+				const auto weak = base::make_weak(controller);
 				FileDialog::GetWritePath(
 					Core::App().getFileDialogParent(),
 					tr::lng_extera_export(tr::now),
@@ -3461,8 +3552,10 @@ void PartOther3(SectionBuilder &builder) {
 						auto file = QFile(path);
 						if (file.open(QIODevice::WriteOnly)) {
 							file.write(Config().exportJson());
-							controller->showToast(
-								tr::lng_extera_exported(tr::now));
+							if (const auto strong = weak.get()) {
+								strong->showToast(
+									tr::lng_extera_exported(tr::now));
+							}
 						}
 					});
 			},
@@ -3472,6 +3565,7 @@ void PartOther3(SectionBuilder &builder) {
 			.title = tr::lng_extera_import(),
 			.icon = { &st::exteraIconImport },
 			.onClick = [=] {
+				const auto weak = base::make_weak(controller);
 				FileDialog::GetOpenPath(
 					Core::App().getFileDialogParent(),
 					tr::lng_extera_import(tr::now),
@@ -3484,9 +3578,12 @@ void PartOther3(SectionBuilder &builder) {
 								data = file.readAll();
 							}
 						}
-						controller->showToast(Config().importJson(data)
-							? tr::lng_extera_imported(tr::now)
-							: tr::lng_extera_import_failed(tr::now));
+						const auto imported = Config().importJson(data);
+						if (const auto strong = weak.get()) {
+							strong->showToast(imported
+								? tr::lng_extera_imported(tr::now)
+								: tr::lng_extera_import_failed(tr::now));
+						}
 					});
 			},
 		});
@@ -3495,6 +3592,9 @@ void PartOther3(SectionBuilder &builder) {
 			.title = tr::lng_extera_reset(),
 			.icon = { &st::exteraIconReset },
 			.onClick = [=] {
+				if (!controller) {
+					return;
+				}
 				controller->show(Ui::MakeConfirmBox({
 					.text = tr::lng_extera_reset_sure(),
 					.confirmed = [=](Fn<void()> close) {
@@ -3830,7 +3930,9 @@ void FillSearchResults(
 			button->setClickedCallback([=] {
 				crl::on_main(controller, [=] {
 					controller->setHighlightControlId(entry.id);
-					showOther(entry.section);
+					if (showOther) {
+						showOther(entry.section);
+					}
 				});
 			});
 		}
@@ -3885,7 +3987,7 @@ void AddCategorySearch(
 					showOther,
 					sections,
 					value);
-			}, row->lifetime());
+			}, container->lifetime());
 			return SectionBuilder::WidgetToAdd{ .widget = std::move(result) };
 		});
 	}
@@ -3925,7 +4027,9 @@ void AddCategoryGrid(SectionBuilder &builder) {
 		const auto cards = std::make_shared<std::vector<CategoryCard>>(
 			std::vector<CategoryCard>{
 			{ [] { return tr::lng_extera_general(); },
-				[] { return rpl::single(u"Profile, spoofing, archive & performance"_q); },
+				[]() -> rpl::producer<QString> {
+					return rpl::single(u"Profile, spoofing, archive & performance"_q);
+				},
 				&st::menuIconSettings,
 				ExteraGeneralId,
 				QColor(0x3A, 0x9B, 0xF0) },
@@ -3945,17 +4049,23 @@ void AddCategoryGrid(SectionBuilder &builder) {
 				ExteraPrivacyId,
 				QColor(0x5B, 0x6B, 0xE8) },
 			{ [] { return tr::lng_extera_nav_title(); },
-				[] { return rpl::single(u"PillStack badges & drawer navigation"_q); },
+				[]() -> rpl::producer<QString> {
+					return rpl::single(u"PillStack badges & drawer navigation"_q);
+				},
 				&st::menuIconReorder,
 				ExteraNavigationId,
 				QColor(0xF0, 0x8A, 0x3A) },
 			{ [] { return tr::lng_extera_ai_chat(); },
-				[] { return rpl::single(u"AI assistant, models & generation"_q); },
+				[]() -> rpl::producer<QString> {
+					return rpl::single(u"AI assistant, models & generation"_q);
+				},
 				&st::exdMenuIconAi,
 				ExteraAiChatId,
 				QColor(0xE2, 0x55, 0x7B) },
 			{ [] { return tr::lng_extera_other(); },
-				[] { return rpl::single(u"Media, playlists, backup, updates & tools"_q); },
+				[]() -> rpl::producer<QString> {
+					return rpl::single(u"Media, playlists, backup, updates & tools"_q);
+				},
 				&st::exteraIconOther,
 				ExteraOtherId,
 				QColor(0x3C, 0xB3, 0x71) },
@@ -4113,9 +4223,11 @@ void AddCategoryGrid(SectionBuilder &builder) {
 					image.setDevicePixelRatio(ratio);
 					{
 						auto q = QPainter(&image);
-						QSvgRenderer(QByteArray(kCardSvgs[i])).render(
-							&q,
-							QRectF(0, 0, iconSize, iconSize));
+						if (i < int(std::size(kCardSvgs))) {
+							QSvgRenderer(QByteArray(kCardSvgs[i])).render(
+								&q,
+								QRectF(0, 0, iconSize, iconSize));
+						}
 						if (md3) {
 							q.setCompositionMode(
 								QPainter::CompositionMode_SourceIn);
@@ -4234,7 +4346,9 @@ void AddCategoryGrid(SectionBuilder &builder) {
 				if (index >= 0 && index == pressed) {
 					const auto target = (*cards)[index].target();
 					crl::on_main(controller, [=] {
-						showOther(target);
+						if (showOther) {
+							showOther(target);
+						}
 					});
 				}
 			}
@@ -4290,6 +4404,10 @@ void BuildPluginsEngine(SectionBuilder &builder) {
 					Config().setBool(u"plugins_unknown_sources"_q, false);
 					return;
 				}
+				if (!controller) {
+					unknownStates->fire(false);
+					return;
+				}
 				Extera::Plugins::ShowUnknownSourcesWarning(
 					controller,
 					[=](bool allowed) {
@@ -4318,16 +4436,19 @@ void BuildPluginsEngine(SectionBuilder &builder) {
 			.title = tr::lng_exd_plugins_export(),
 			.icon = { &st::menuIconExport },
 			.onClick = [=] {
+				const auto weak = base::make_weak(controller);
 				FileDialog::GetFolder(
 					Core::App().getFileDialogParent(),
 					tr::lng_exd_plugins_export(tr::now),
 					QString(),
 					[=](QString &&folder) {
 						const auto count = Extera::Plugins::ExportAll(folder);
-						controller->showToast(tr::lng_exd_plugins_exported(
-							tr::now,
-							lt_count,
-							count));
+						if (const auto strong = weak.get()) {
+							strong->showToast(tr::lng_exd_plugins_exported(
+								tr::now,
+								lt_count,
+								count));
+						}
 					});
 			},
 		});
@@ -4375,7 +4496,7 @@ void BuildPluginsEngine(SectionBuilder &builder) {
 						QString::number(bare))),
 				.icon = { &st::menuIconChannel },
 				.onClick = [=] {
-					if (channel) {
+					if (channel && controller) {
 						controller->showPeerHistory(
 							channel,
 							Window::SectionShow::Way::Forward);
@@ -4973,6 +5094,7 @@ void ShowPresetSaveBox(
 		not_null<Window::SessionController*> controller,
 		Fn<void()> saved) {
 	controller->show(Box([=](not_null<Ui::GenericBox*> box) {
+		const auto weak = base::make_weak(controller);
 		box->setTitle(tr::lng_exd_presets_save());
 		const auto field = box->addRow(object_ptr<Ui::InputField>(
 			box,
@@ -4987,10 +5109,13 @@ void ShowPresetSaveBox(
 				return;
 			}
 			Exd::SettingsSync::SavePreset(name);
-			controller->showToast(tr::lng_exd_presets_saved(tr::now));
+			if (const auto strong = weak.get()) {
+				strong->showToast(tr::lng_exd_presets_saved(tr::now));
+			}
+			const auto onSaved = saved;
 			box->closeBox();
-			if (saved) {
-				saved();
+			if (onSaved) {
+				onSaved();
 			}
 		};
 		field->submits() | rpl::on_next(submit, field->lifetime());
@@ -5001,12 +5126,16 @@ void ShowPresetSaveBox(
 
 void ShowPresetsBox(not_null<Window::SessionController*> controller) {
 	controller->show(Box([=](not_null<Ui::GenericBox*> box) {
+		const auto weak = base::make_weak(controller);
 		box->setTitle(tr::lng_exd_presets());
 		box->setWidth(st::boxWideWidth);
 		const auto list = box->addRow(
 			object_ptr<Ui::VerticalLayout>(box),
 			style::margins());
-		const auto rebuild = std::make_shared<Fn<void()>>();
+		const auto rebuild = box->lifetime().make_state<Fn<void()>>();
+		const auto refresh = crl::guard(box, [=] {
+			(*rebuild)();
+		});
 		*rebuild = [=] {
 			while (list->count()) {
 				delete list->widgetAt(0);
@@ -5026,7 +5155,11 @@ void ShowPresetsBox(not_null<Window::SessionController*> controller) {
 					rpl::single(name),
 					st::settingsButtonNoIcon));
 				button->setClickedCallback([=] {
-					controller->show(Box([=](not_null<Ui::GenericBox*> inner) {
+					const auto strong = weak.get();
+					if (!strong) {
+						return;
+					}
+					strong->show(Box([=](not_null<Ui::GenericBox*> inner) {
 						inner->setTitle(rpl::single(name));
 						inner->addRow(
 							object_ptr<Ui::FlatLabel>(
@@ -5036,18 +5169,20 @@ void ShowPresetsBox(not_null<Window::SessionController*> controller) {
 							st::boxRowPadding);
 						inner->addButton(tr::lng_exd_presets_apply(), [=] {
 							if (Exd::SettingsSync::ApplyPreset(name)) {
-								controller->showToast(
-									tr::lng_exd_presets_applied(
-										tr::now,
-										lt_name,
-										name));
+								if (const auto s = weak.get()) {
+									s->showToast(
+										tr::lng_exd_presets_applied(
+											tr::now,
+											lt_name,
+											name));
+								}
 							}
 							inner->closeBox();
 						});
 						inner->addLeftButton(tr::lng_exd_presets_delete(), [=] {
 							Exd::SettingsSync::DeletePreset(name);
 							inner->closeBox();
-							(*rebuild)();
+							refresh();
 						});
 						inner->addButton(tr::lng_cancel(), [=] {
 							inner->closeBox();
@@ -5059,7 +5194,9 @@ void ShowPresetsBox(not_null<Window::SessionController*> controller) {
 		};
 		(*rebuild)();
 		box->addLeftButton(tr::lng_exd_presets_save(), [=] {
-			ShowPresetSaveBox(controller, [=] { (*rebuild)(); });
+			if (const auto strong = weak.get()) {
+				ShowPresetSaveBox(strong, refresh);
+			}
 		});
 		box->addButton(tr::lng_close(), [=] { box->closeBox(); });
 	}));
@@ -5071,13 +5208,18 @@ void PartOtherSync(SectionBuilder &builder) {
 		return;
 	}
 	const auto session = &controller->session();
+	const auto weakSession = base::make_weak(session);
 	const auto local = std::make_shared<rpl::variable<QString>>(
 		ExdSyncDateText(Exd::SettingsSync::LocalDate()));
 	const auto cloud = std::make_shared<rpl::variable<QString>>(
 		tr::lng_exd_sync_checking(tr::now));
 	const auto refresh = [=] {
+		const auto strongSession = weakSession.get();
+		if (!strongSession) {
+			return;
+		}
 		*local = ExdSyncDateText(Exd::SettingsSync::LocalDate());
-		Exd::SettingsSync::FetchCloudDate(session, [=](
+		Exd::SettingsSync::FetchCloudDate(strongSession, [=](
 				TimeId date,
 				QString error) {
 			*cloud = error.isEmpty()
@@ -5111,12 +5253,18 @@ void PartOtherSync(SectionBuilder &builder) {
 			.title = tr::lng_exd_sync_upload(),
 			.icon = { &st::exteraIconExport },
 			.onClick = [=] {
-				Exd::SettingsSync::Upload(session, [=](QString error) {
-					controller->showToast(error.isEmpty()
-						? tr::lng_exd_sync_uploaded(tr::now)
-						: ExdSyncError(error));
-					refresh();
-				});
+				const auto strongSession = weakSession.get();
+				if (!strongSession) {
+					return;
+				}
+				Exd::SettingsSync::Upload(
+					strongSession,
+					crl::guard(controller, [=](QString error) {
+						controller->showToast(error.isEmpty()
+							? tr::lng_exd_sync_uploaded(tr::now)
+							: ExdSyncError(error));
+						refresh();
+					}));
 			},
 			.keywords = { u"sync"_q, u"cloud"_q, u"backup"_q },
 		});
@@ -5128,14 +5276,18 @@ void PartOtherSync(SectionBuilder &builder) {
 				controller->show(Ui::MakeConfirmBox({
 					.text = tr::lng_exd_sync_restore_sure(),
 					.confirmed = [=](Fn<void()> close) {
+						const auto strongSession = weakSession.get();
+						if (strongSession) {
+							Exd::SettingsSync::Restore(
+								strongSession,
+								crl::guard(controller, [=](QString error) {
+									controller->showToast(error.isEmpty()
+										? tr::lng_exd_sync_restored(tr::now)
+										: ExdSyncError(error));
+									refresh();
+								}));
+						}
 						close();
-						Exd::SettingsSync::Restore(session, [=](
-								QString error) {
-							controller->showToast(error.isEmpty()
-								? tr::lng_exd_sync_restored(tr::now)
-								: ExdSyncError(error));
-							refresh();
-						});
 					},
 					.confirmText = tr::lng_exd_sync_restore(),
 				}));
@@ -5150,14 +5302,18 @@ void PartOtherSync(SectionBuilder &builder) {
 				controller->show(Ui::MakeConfirmBox({
 					.text = tr::lng_exd_sync_clear_sure(),
 					.confirmed = [=](Fn<void()> close) {
+						const auto strongSession = weakSession.get();
+						if (strongSession) {
+							Exd::SettingsSync::Clear(
+								strongSession,
+								crl::guard(controller, [=](QString error) {
+									controller->showToast(error.isEmpty()
+										? tr::lng_exd_sync_cleared(tr::now)
+										: ExdSyncError(error));
+									refresh();
+								}));
+						}
 						close();
-						Exd::SettingsSync::Clear(session, [=](
-								QString error) {
-							controller->showToast(error.isEmpty()
-								? tr::lng_exd_sync_cleared(tr::now)
-								: ExdSyncError(error));
-							refresh();
-						});
 					},
 					.confirmText = tr::lng_exd_sync_clear(),
 					.confirmStyle = &st::attentionBoxButton,
@@ -5448,7 +5604,9 @@ void SendBadgeCommand(
 
 void ShowBadgeEditBox(not_null<Window::SessionController*> controller) {
 	controller->show(Box([=](not_null<Ui::GenericBox*> box) {
+		const auto weak = base::make_weak(controller);
 		const auto session = &controller->session();
+		const auto weakSession = base::make_weak(session);
 		const auto user = session->user();
 		box->setTitle(tr::lng_exd_badge_edit_title());
 		box->setWidth(st::boxWideWidth);
@@ -5501,11 +5659,13 @@ void ShowBadgeEditBox(not_null<Window::SessionController*> controller) {
 			});
 		}, preview->lifetime());
 		button->setClickedCallback([=] {
-			state->panel.show({
-				.controller = controller,
-				.button = preview,
-				.channelStatusMode = true,
-			});
+			if (const auto strong = weak.get()) {
+				state->panel.show({
+					.controller = strong,
+					.button = preview,
+					.channelStatusMode = true,
+				});
+			}
 		});
 		state->panel.someCustomChosen(
 		) | rpl::on_next([=](const Info::Profile::EmojiStatusPanel::CustomChosen &chosen) {
@@ -5541,8 +5701,12 @@ void ShowBadgeEditBox(not_null<Window::SessionController*> controller) {
 				box->closeBox();
 				return;
 			}
-			SendBadgeCommand(session, emoji, text);
-			controller->showToast(tr::lng_exd_badge_edit_sent(tr::now));
+			if (const auto strongSession = weakSession.get()) {
+				SendBadgeCommand(strongSession, emoji, text);
+			}
+			if (const auto strong = weak.get()) {
+				strong->showToast(tr::lng_exd_badge_edit_sent(tr::now));
+			}
 			box->closeBox();
 		};
 		field->submits() | rpl::on_next(save, field->lifetime());
@@ -5721,8 +5885,11 @@ void ShowExteraBadgeBox(
 				tr::lng_exd_badge_box_change(),
 				st::exteraInstallButton,
 				[=] {
+					const auto weak = base::make_weak(controller);
 					box->closeBox();
-					ShowBadgeEditBox(controller);
+					if (const auto strong = weak.get()) {
+						ShowBadgeEditBox(strong);
+					}
 				});
 		} else if (!own) {
 			add(

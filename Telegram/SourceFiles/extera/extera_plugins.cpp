@@ -87,6 +87,7 @@
 #include <QtCore/QTimer>
 #include <QtCore/QMutex>
 #include <QtCore/QSysInfo>
+#include <QtCore/QThread>
 #include <QtNetwork/QNetworkInterface>
 #include <QtCore/QRegularExpression>
 #include <QtGui/QClipboard>
@@ -232,6 +233,9 @@ private:
 
 void ShowAutoSafeModeBox(bool hang = false) {
 	base::call_delayed(3000, [=] {
+		if (!Core::IsAppLaunched() || Core::Quitting()) {
+			return;
+		}
 		const auto window = Core::App().activePrimaryWindow();
 		const auto controller = window ? window->sessionController() : nullptr;
 		if (!controller) {
@@ -1362,7 +1366,11 @@ PyObject *NativeCopy(PyObject *self, PyObject *args) {
 		return nullptr;
 	}
 	const auto value = QString::fromUtf8(text);
-	crl::on_main([=] { QGuiApplication::clipboard()->setText(value); });
+	crl::on_main([=] {
+		if (const auto clipboard = QGuiApplication::clipboard()) {
+			clipboard->setText(value);
+		}
+	});
 	return Py_BuildValue("");
 }
 
@@ -1394,6 +1402,9 @@ PyObject *NativeRunOnMain(PyObject *self, PyObject *args) {
 	Py_INCREF(callable);
 	const auto owner = SandboxOwnerNow();
 	const auto run = [=] {
+		if (Core::Quitting() || !Instance().started) {
+			return;
+		}
 		auto gil = Gil();
 		const auto token = SandboxToken();
 		if (!owner.isEmpty()) {
@@ -1410,7 +1421,13 @@ PyObject *NativeRunOnMain(PyObject *self, PyObject *args) {
 		Py_DECREF(callable);
 	};
 	if (delay > 0) {
-		crl::on_main([=] { base::call_delayed(delay, run); });
+		crl::on_main([=] {
+			base::call_delayed(delay, [=] {
+				if (!Core::Quitting() && Instance().started) {
+					run();
+				}
+			});
+		});
 	} else {
 		crl::on_main(run);
 	}
@@ -1989,8 +2006,7 @@ PyObject *NativeSendRawRequest(PyObject *self, PyObject *args) {
 	}
 	const auto bytes = QByteArray::fromBase64(QByteArray(encoded));
 	const auto callback = QString::fromUtf8(callbackId);
-	const auto controller = ActiveController();
-	if (!controller || bytes.size() < 4 || (bytes.size() % 4) != 0) {
+	if (bytes.size() < 4 || (bytes.size() % 4) != 0) {
 		return PyLong_FromLongLong(0);
 	}
 	auto primes = QVector<mtpPrime>(bytes.size() / 4);
@@ -2006,22 +2022,42 @@ PyObject *NativeSendRawRequest(PyObject *self, PyObject *args) {
 		});
 		return PyLong_FromLongLong(0);
 	}
-	const auto session = &controller->session();
-	const auto id = session->api().request(
-		RawRequest(RawRequestBare(std::move(primes)))
-	).done([=](const RawRequest &result) {
-		Call(u"request_callback"_q, QJsonObject{
-			{ u"id"_q, callback },
-			{ u"raw"_q, QString::fromLatin1(result.bytes().toBase64()) },
+	const auto sendOnMain = [=](QVector<mtpPrime> p) {
+		if (!Core::IsAppLaunched() || Core::Quitting()) {
+			return int64(0);
+		}
+		const auto controller = ActiveController();
+		if (!controller) {
+			return int64(0);
+		}
+		const auto session = &controller->session();
+		const auto id = session->api().request(
+			RawRequest(RawRequestBare(std::move(p)))
+		).done(crl::guard(session, [=](const RawRequest &result) {
+			if (!Core::Quitting()) {
+				Call(u"request_callback"_q, QJsonObject{
+					{ u"id"_q, callback },
+					{ u"raw"_q, QString::fromLatin1(result.bytes().toBase64()) },
+				});
+			}
+		})).fail(crl::guard(session, [=](const MTP::Error &error) {
+			if (!Core::Quitting()) {
+				Call(u"request_callback"_q, QJsonObject{
+					{ u"id"_q, callback },
+					{ u"error"_q, error.type() },
+					{ u"code"_q, error.code() },
+				});
+			}
+		})).send();
+		return int64(id);
+	};
+	if (qApp && QThread::currentThread() != qApp->thread()) {
+		crl::on_main([=, p = std::move(primes)]() mutable {
+			sendOnMain(std::move(p));
 		});
-	}).fail([=](const MTP::Error &error) {
-		Call(u"request_callback"_q, QJsonObject{
-			{ u"id"_q, callback },
-			{ u"error"_q, error.type() },
-			{ u"code"_q, error.code() },
-		});
-	}).send();
-	return PyLong_FromLongLong(id);
+		return PyLong_FromLongLong(0);
+	}
+	return PyLong_FromLongLong(sendOnMain(std::move(primes)));
 }
 
 PyObject *NativeSendRequest(PyObject *self, PyObject *args) {
@@ -2035,51 +2071,66 @@ PyObject *NativeSendRequest(PyObject *self, PyObject *args) {
 	const auto name = payload.value(u"request"_q).toString();
 	const auto params = payload.value(u"params"_q).toObject();
 	const auto callback = QString::fromUtf8(callbackId);
-	const auto finish = [=](const QJsonObject &response, const QString &error) {
-		Call(u"request_callback"_q, QJsonObject{
-			{ u"id"_q, callback },
-			{ u"response"_q, response },
-			{ u"error"_q, error },
-		});
-	};
-	const auto controller = ActiveController();
-	if (!controller || name.isEmpty()) {
+	if (name.isEmpty()) {
 		return PyLong_FromLongLong(0);
 	}
-	const auto session = &controller->session();
-	if (name == u"messages_setTyping"_q || name == u"setTyping"_q) {
-		const auto peer = ResolveDialog(
-			session,
-			int64(params.value(u"peer"_q).toDouble()));
-		if (!peer) {
-			finish({}, u"peer not found"_q);
-			return PyLong_FromLongLong(0);
+	const auto sendOnMain = [=] {
+		const auto finish = [=](const QJsonObject &response, const QString &error) {
+			if (!Core::Quitting()) {
+				Call(u"request_callback"_q, QJsonObject{
+					{ u"id"_q, callback },
+					{ u"response"_q, response },
+					{ u"error"_q, error },
+				});
+			}
+		};
+		if (!Core::IsAppLaunched() || Core::Quitting()) {
+			return int64(0);
 		}
-		const auto id = session->api().request(MTPmessages_SetTyping(
-			MTP_flags(MTPmessages_SetTyping::Flag(0)),
-			peer->input(),
-			MTP_int(0),
-			MTP_sendMessageTypingAction()
-		)).done([=](const MTPBool &result) {
-			finish({}, QString());
-		}).fail([=](const MTP::Error &error) {
-			finish({}, error.type());
-		}).send();
-		return PyLong_FromLongLong(id);
+		const auto controller = ActiveController();
+		if (!controller) {
+			return int64(0);
+		}
+		const auto session = &controller->session();
+		if (name == u"messages_setTyping"_q || name == u"setTyping"_q) {
+			const auto peer = ResolveDialog(
+				session,
+				int64(params.value(u"peer"_q).toDouble()));
+			if (!peer) {
+				finish({}, u"peer not found"_q);
+				return int64(0);
+			}
+			const auto id = session->api().request(MTPmessages_SetTyping(
+				MTP_flags(MTPmessages_SetTyping::Flag(0)),
+				peer->input(),
+				MTP_int(0),
+				MTP_sendMessageTypingAction()
+			)).done(crl::guard(session, [=](const MTPBool &) {
+				finish({}, QString());
+			})).fail(crl::guard(session, [=](const MTP::Error &error) {
+				finish({}, error.type());
+			})).send();
+			return int64(id);
+		}
+		if (name == u"account_updateStatus"_q || name == u"updateStatus"_q) {
+			const auto offline = params.value(u"offline"_q).toBool();
+			const auto id = session->api().request(MTPaccount_UpdateStatus(
+				MTP_bool(offline)
+			)).done(crl::guard(session, [=](const MTPBool &) {
+				finish({}, QString());
+			})).fail(crl::guard(session, [=](const MTP::Error &error) {
+				finish({}, error.type());
+			})).send();
+			return int64(id);
+		}
+		LOG(("Plugins: send_request: unknown request %1").arg(name));
+		return int64(0);
+	};
+	if (qApp && QThread::currentThread() != qApp->thread()) {
+		crl::on_main([=] { sendOnMain(); });
+		return PyLong_FromLongLong(0);
 	}
-	if (name == u"account_updateStatus"_q || name == u"updateStatus"_q) {
-		const auto offline = params.value(u"offline"_q).toBool();
-		const auto id = session->api().request(MTPaccount_UpdateStatus(
-			MTP_bool(offline)
-		)).done([=](const MTPBool &result) {
-			finish({}, QString());
-		}).fail([=](const MTP::Error &error) {
-			finish({}, error.type());
-		}).send();
-		return PyLong_FromLongLong(id);
-	}
-	LOG(("Plugins: send_request: unknown request %1").arg(name));
-	return PyLong_FromLongLong(0);
+	return PyLong_FromLongLong(sendOnMain());
 }
 
 PyObject *NativeViewsShowSheet(PyObject *self, PyObject *args) {
@@ -2393,6 +2444,9 @@ QString RuntimeError() {
 }
 
 void VerifyInstalledPlugins() {
+	if (!Core::IsAppLaunched() || Core::Quitting()) {
+		return;
+	}
 	const auto controller = ActiveController();
 	if (!controller) {
 		return;
@@ -2405,7 +2459,7 @@ void VerifyInstalledPlugins() {
 		}
 		const auto path = info.value(u"path"_q).toString();
 		Extera::PluginTrust::Verify(session, path, [=](bool ok) {
-			if (!ok) {
+			if (!ok || !Core::IsAppLaunched() || Core::Quitting()) {
 				return;
 			}
 			Call(u"trust"_q, QJsonObject{ { u"path"_q, path } });
@@ -2426,46 +2480,55 @@ void Start() {
 		state.error = tr::lng_extera_plugins_runtime_missing(tr::now);
 		return;
 	}
+	static auto initialized = false;
+	if (!initialized) {
 #ifdef Q_OS_WIN
-	const auto dll = QDir::toNativeSeparators(
-		RuntimePath() + u"python311.dll"_q).toStdWString();
-	if (!LoadLibraryExW(
-			dll.c_str(),
-			nullptr,
-			LOAD_WITH_ALTERED_SEARCH_PATH)) {
-		const auto code = GetLastError();
-		state.error = tr::lng_exd_plugins_dll_failed(
-			tr::now,
-			lt_code,
-			QString::number(code));
-		return;
-	}
+		const auto dll = QDir::toNativeSeparators(
+			RuntimePath() + u"python311.dll"_q).toStdWString();
+		if (!LoadLibraryExW(
+				dll.c_str(),
+				nullptr,
+				LOAD_WITH_ALTERED_SEARCH_PATH)) {
+			const auto code = GetLastError();
+			state.error = tr::lng_exd_plugins_dll_failed(
+				tr::now,
+				lt_code,
+				QString::number(code));
+			return;
+		}
 #endif // Q_OS_WIN
-	if (PyImport_AppendInittab("_extera", InitNativeModule) == -1) {
-		state.error = u"Native module registration failed"_q;
-		return;
-	}
-	LOG(("Plugins: runtime %1").arg(RuntimePath()));
-	if (!InitInterpreter(RuntimePath())) {
-		LOG(("Plugins Error: %1").arg(state.error));
-		return;
-	}
-	const auto module = PyImport_ImportModule("extera_host");
-	if (!module) {
-		const auto details = PythonErrorText();
-		LOG(("Plugins Error: extera_host import failed: %1").arg(details));
-		state.error = u"extera_host import failed: "_q
-			+ details.split('\n').last();
+		if (PyImport_AppendInittab("_extera", InitNativeModule) == -1) {
+			state.error = u"Native module registration failed"_q;
+			return;
+		}
+		LOG(("Plugins: runtime %1").arg(RuntimePath()));
+		if (!InitInterpreter(RuntimePath())) {
+			LOG(("Plugins Error: %1").arg(state.error));
+			return;
+		}
+		initialized = true;
 		state.mainThread = PyEval_SaveThread();
-		return;
 	}
-	state.dispatch = PyObject_GetAttrString(module, "dispatch");
-	Py_DECREF(module);
-	state.mainThread = PyEval_SaveThread();
-	state.started = (state.dispatch != nullptr);
-	if (!state.started) {
-		return;
+	{
+		auto gil = Gil();
+		const auto module = PyImport_ImportModule("extera_host");
+		if (!module) {
+			const auto details = PythonErrorText();
+			LOG(("Plugins Error: extera_host import failed: %1").arg(details));
+			state.error = u"extera_host import failed: "_q
+				+ details.split('\n').last();
+			return;
+		}
+		state.dispatch = PyObject_GetAttrString(module, "dispatch");
+		Py_DECREF(module);
+		if (!state.dispatch) {
+			PyErr_Clear();
+			state.error = u"extera_host.dispatch missing"_q;
+			return;
+		}
 	}
+	state.started = true;
+	Extera::Views::UiMetrics();
 	QDir().mkpath(DataPath() + u"plugins"_q);
 	RefreshSecrets();
 	[[maybe_unused]] static const auto secretsTimer = [] {
@@ -2550,6 +2613,8 @@ void Shutdown() {
 	Call(u"shutdown"_q);
 	WatchdogRunning = false;
 	state.started = false;
+	state.lifetime.destroy();
+	state.pendingEvents.clear();
 	QFile::remove(StartMarkerPath());
 }
 
@@ -2925,7 +2990,11 @@ void QueueFlush() {
 		return;
 	}
 	state.flushScheduled = true;
-	QTimer::singleShot(30, [] { FlushEvents(); });
+	QTimer::singleShot(30, qApp, [] {
+		if (!Core::Quitting()) {
+			FlushEvents();
+		}
+	});
 }
 
 void QueueEvent(QJsonObject event) {

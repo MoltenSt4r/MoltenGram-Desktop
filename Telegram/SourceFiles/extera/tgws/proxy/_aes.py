@@ -17,12 +17,36 @@ try:
 except ImportError:
     import ctypes
     import ctypes.util
+    import sys
 
     def _load_libcrypto():
         name = ctypes.util.find_library("crypto")
         candidates = []
         if name:
             candidates.append(name)
+        if sys.platform == "win32":
+            exe_dir = getattr(sys, "_MEIPASS", None)
+            import os
+            base = os.path.dirname(os.path.abspath(__file__))
+            py_dir = os.path.dirname(sys.executable)
+            for d in [p for p in (exe_dir, py_dir, os.path.dirname(py_dir), base) if p]:
+                for dll in (
+                    "libcrypto-3-x64.dll", "libcrypto-3.dll",
+                    "libcrypto-1_1-x64.dll", "libcrypto-1_1.dll",
+                    "libcrypto.dll",
+                ):
+                    candidates.append(os.path.join(d, dll))
+            candidates += [
+                "libcrypto-3-x64.dll", "libcrypto-3.dll",
+                "libcrypto-1_1-x64.dll", "libcrypto-1_1.dll",
+            ]
+        elif sys.platform == "darwin":
+            candidates += [
+                "libcrypto.3.dylib", "libcrypto.1.1.dylib", "libcrypto.dylib",
+                "/opt/homebrew/opt/openssl@3/lib/libcrypto.3.dylib",
+                "/usr/local/opt/openssl@3/lib/libcrypto.3.dylib",
+                "/usr/lib/libcrypto.dylib",
+            ]
         candidates += [
             "libcrypto.so.3", "libcrypto.so.1.1", "libcrypto.so.1.0.0",
             "libcrypto.so", "/opt/lib/libcrypto.so",

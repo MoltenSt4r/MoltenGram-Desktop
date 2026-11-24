@@ -510,6 +510,9 @@ void StartWelcome() {
 			return;
 		}
 		base::call_delayed(1500, [=] {
+			if (!Core::IsAppLaunched() || Core::Quitting()) {
+				return;
+			}
 			const auto window = Core::App().activePrimaryWindow();
 			const auto controller = window
 				? window->sessionController()

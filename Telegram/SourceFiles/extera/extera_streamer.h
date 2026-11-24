@@ -1,5 +1,9 @@
 #pragma once
 
+#include "base/basic_types.h"
+
+#include <QtCore/QString>
+
 class PeerData;
 
 namespace Window {

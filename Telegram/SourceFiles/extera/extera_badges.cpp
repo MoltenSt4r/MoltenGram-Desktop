@@ -4,9 +4,11 @@
 #include "ui/painter.h"
 #include "styles/style_basic.h"
 
+#include "core/application.h"
 #include "data/data_peer.h"
 #include "settings.h"
 
+#include <QtCore/QCoreApplication>
 #include <QtCore/QFile>
 #include <QtCore/QJsonArray>
 #include <QtCore/QJsonDocument>
@@ -258,9 +260,9 @@ bool ApplyHashes(const QByteArray &bytes) {
 void RefreshHashes(QNetworkAccessManager *manager, bool fresh = false) {
 	auto request = FileRequest(u"trusted_hashes.json"_q, fresh);
 	const auto reply = manager->get(request);
-	QObject::connect(reply, &QNetworkReply::finished, [=] {
+	QObject::connect(reply, &QNetworkReply::finished, reply, [=] {
 		reply->deleteLater();
-		if (reply->error() != QNetworkReply::NoError) {
+		if (Core::Quitting() || reply->error() != QNetworkReply::NoError) {
 			return;
 		}
 		const auto bytes = reply->readAll();
@@ -281,9 +283,9 @@ void RefreshHashes(QNetworkAccessManager *manager, bool fresh = false) {
 void RefreshOwnFromRepo(QNetworkAccessManager *manager, bool fresh) {
 	auto request = FileRequest(u"badges.json"_q, fresh);
 	const auto reply = manager->get(request);
-	QObject::connect(reply, &QNetworkReply::finished, [=] {
+	QObject::connect(reply, &QNetworkReply::finished, reply, [=] {
 		reply->deleteLater();
-		if (reply->error() != QNetworkReply::NoError) {
+		if (Core::Quitting() || reply->error() != QNetworkReply::NoError) {
 			return;
 		}
 		const auto bytes = reply->readAll();

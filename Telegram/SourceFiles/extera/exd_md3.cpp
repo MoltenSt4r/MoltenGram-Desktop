@@ -925,12 +925,14 @@ void ShowSettingsBox(not_null<Window::SessionController*> controller) {
 				QString::fromLatin1(kGoogleSans),
 				tr::lng_exd_md3_font_telegram(tr::now),
 			};
+			const auto weakBox = base::make_weak(box.get());
+			const auto weakController = base::make_weak(controller);
 			controller->show(Box([=](not_null<Ui::GenericBox*> choice) {
 				SingleChoiceBox(choice, {
 					.title = tr::lng_exd_md3_font(),
 					.options = options,
 					.initialSelection = Bool(u"md3_google_sans"_q) ? 0 : 1,
-					.callback = [=](int index) {
+					.callback = crl::guard(weakBox, [=](int index) {
 						const auto google = (index == 0);
 						if (google != Bool(u"md3_google_sans"_q)) {
 							Config::Instance().setBool(
@@ -939,7 +941,7 @@ void ShowSettingsBox(not_null<Window::SessionController*> controller) {
 							*fontLabel = fontName();
 							*restart = true;
 						}
-					},
+					}),
 				});
 			}));
 		});
@@ -1127,9 +1129,12 @@ void ShowSettingsBox(not_null<Window::SessionController*> controller) {
 		Ui::AddSkip(content);
 
 		box->addButton(tr::lng_close(), [=] { box->closeBox(); });
+		const auto weakController = base::make_weak(controller);
 		box->boxClosing() | rpl::on_next([=] {
 			if (*restart) {
-				RequestRestart(controller);
+				if (const auto strong = weakController.get()) {
+					RequestRestart(strong);
+				}
 			}
 		}, box->lifetime());
 	}));

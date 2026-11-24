@@ -3,18 +3,21 @@
 #include "extera/extera_badges.h"
 #include "extera/extera_config.h"
 #include "extera/extera_plugins.h"
+#include "core/application.h"
 #include "lang/lang_keys.h"
 #include "lang/lang_instance.h"
 #include "base/zlib_help.h"
 #include "base/unixtime.h"
 #include "settings.h"
 
+#include <QtCore/QCoreApplication>
 #include <QtCore/QCryptographicHash>
 #include <QtCore/QDir>
 #include <QtCore/QFile>
 #include <QtCore/QJsonArray>
 #include <QtCore/QJsonDocument>
 #include <QtCore/QJsonObject>
+#include <QtCore/QMutex>
 #include <QtCore/QRegularExpression>
 #include <QtNetwork/QNetworkAccessManager>
 #include <QtNetwork/QNetworkReply>
@@ -133,9 +136,53 @@ struct Model {
 	return result;
 }
 
-[[nodiscard]] Model &Loaded() {
-	static auto result = Model();
+[[nodiscard]] QMutex &ModelMutex() {
+	static QMutex result;
 	return result;
+}
+
+[[nodiscard]] std::shared_ptr<const Model> &LoadedSnapshot() {
+	static std::shared_ptr<const Model> result;
+	return result;
+}
+
+[[nodiscard]] std::shared_ptr<const Model> LoadModelSnapshot() {
+	{
+		QMutexLocker lock(&ModelMutex());
+		if (LoadedSnapshot() && LoadedSnapshot()->loaded) {
+			return LoadedSnapshot();
+		}
+	}
+	auto model = std::make_shared<Model>();
+	auto meta = QFile(ModelDir() + kMetaFile);
+	if (meta.open(QIODevice::ReadOnly)) {
+		const auto object = QJsonDocument::fromJson(meta.readAll()).object();
+		model->dim = std::max(1, object.value(u"dim"_q).toInt(384));
+		model->threshold = object.value(u"threshold"_q).toDouble(0.649);
+		model->malwareThreshold = object.value(
+			u"malware_threshold"_q).toDouble(0.78);
+		model->minContrast = object.value(
+			u"min_contrast_diff"_q).toDouble(0.04);
+	}
+	auto file = QFile(ModelDir() + kVectorsFile);
+	if (!file.open(QIODevice::ReadOnly)) {
+		return nullptr;
+	}
+	auto zip = zlib::FileToRead(file.readAll());
+	const auto clean = zip.readFileContent("vectors.npy", 0, 256 * 1024 * 1024);
+	zip.clearError();
+	const auto malware = zip.readFileContent(
+		"malware_vectors.npy",
+		0,
+		256 * 1024 * 1024);
+	model->clean = ParseNpy(clean, model->dim);
+	model->malware = ParseNpy(malware, model->dim);
+	model->loaded = (model->clean.rows > 0);
+	QMutexLocker lock(&ModelMutex());
+	if (!LoadedSnapshot() || !LoadedSnapshot()->loaded) {
+		LoadedSnapshot() = model;
+	}
+	return LoadedSnapshot()->loaded ? LoadedSnapshot() : nullptr;
 }
 
 [[nodiscard]] float HalfToFloat(uint16 h) {
@@ -167,7 +214,7 @@ struct Model {
 
 [[nodiscard]] Matrix ParseNpy(const QByteArray &raw, int dim) {
 	auto result = Matrix();
-	if (raw.size() < 12 || !raw.startsWith("\x93NUMPY")) {
+	if (dim <= 0 || raw.size() < 12 || !raw.startsWith("\x93NUMPY")) {
 		return result;
 	}
 	const auto major = uchar(raw[6]);
@@ -183,7 +230,7 @@ struct Model {
 			| (uchar(raw[11]) << 24);
 		offset = 12 + headerLength;
 	}
-	if (offset > raw.size()) {
+	if (offset < 10 || offset > raw.size()) {
 		return result;
 	}
 	const auto header = QString::fromLatin1(raw.mid(0, offset));
@@ -198,38 +245,6 @@ struct Model {
 			: HalfToFloat(uint16(data[i * 2] | (data[i * 2 + 1] << 8)));
 	}
 	return result;
-}
-
-bool LoadModel() {
-	auto &model = Loaded();
-	if (model.loaded) {
-		return true;
-	}
-	auto meta = QFile(ModelDir() + kMetaFile);
-	if (meta.open(QIODevice::ReadOnly)) {
-		const auto object = QJsonDocument::fromJson(meta.readAll()).object();
-		model.dim = object.value(u"dim"_q).toInt(384);
-		model.threshold = object.value(u"threshold"_q).toDouble(0.649);
-		model.malwareThreshold = object.value(
-			u"malware_threshold"_q).toDouble(0.78);
-		model.minContrast = object.value(
-			u"min_contrast_diff"_q).toDouble(0.04);
-	}
-	auto file = QFile(ModelDir() + kVectorsFile);
-	if (!file.open(QIODevice::ReadOnly)) {
-		return false;
-	}
-	auto zip = zlib::FileToRead(file.readAll());
-	const auto clean = zip.readFileContent("vectors.npy", 0, 256 * 1024 * 1024);
-	zip.clearError();
-	const auto malware = zip.readFileContent(
-		"malware_vectors.npy",
-		0,
-		256 * 1024 * 1024);
-	model.clean = ParseNpy(clean, model.dim);
-	model.malware = ParseNpy(malware, model.dim);
-	model.loaded = (model.clean.rows > 0);
-	return model.loaded;
 }
 
 [[nodiscard]] std::vector<std::pair<int, float>> HashToken(
@@ -283,6 +298,8 @@ bool LoadModel() {
 
 struct VectorStats {
 	bool used = false;
+	int cleanRows = 0;
+	int malwareRows = 0;
 	int scanned = 0;
 	int malware = 0;
 	int dangerous = 0;
@@ -297,16 +314,23 @@ struct VectorStats {
 
 [[nodiscard]] VectorStats ScanVectors(const QJsonArray &chunks) {
 	auto result = VectorStats();
-	if (!LoadModel()) {
+	const auto modelPtr = LoadModelSnapshot();
+	if (!modelPtr) {
 		return result;
 	}
-	const auto &model = Loaded();
+	const auto &model = *modelPtr;
 	result.used = true;
+	result.cleanRows = model.clean.rows;
+	result.malwareRows = model.malware.rows;
 	result.threshold = model.threshold;
 	auto sumAvg = 0.;
 	for (const auto &entry : chunks) {
-		const auto code = entry.toArray().at(2).toString();
-		const auto danger = entry.toArray().at(3).toBool();
+		const auto row = entry.toArray();
+		if (row.size() < 4) {
+			continue;
+		}
+		const auto code = row.at(2).toString();
+		const auto danger = row.at(3).toBool();
 		const auto vec = HashToken(code, model.dim);
 		if (vec.empty()) {
 			continue;
@@ -554,13 +578,18 @@ void Arbitrate(
 	const auto reply = Network()->post(
 		request,
 		QJsonDocument(body).toJson(QJsonDocument::Compact));
-	QObject::connect(reply, &QNetworkReply::finished, [=]() mutable {
+	QObject::connect(reply, &QNetworkReply::finished, reply, [=]() mutable {
 		reply->deleteLater();
+		if (Core::Quitting()) {
+			return;
+		}
 		const auto data = reply->readAll();
 		const auto object = QJsonDocument::fromJson(data).object();
-		const auto content = object.value(u"choices"_q).toArray().at(0)
-			.toObject().value(u"message"_q).toObject()
-			.value(u"content"_q).toString();
+		const auto choices = object.value(u"choices"_q).toArray();
+		const auto content = !choices.isEmpty()
+			? choices.at(0).toObject().value(u"message"_q).toObject()
+				.value(u"content"_q).toString()
+			: QString();
 		auto start = content.indexOf('{');
 		auto end = content.lastIndexOf('}');
 		const auto parsed = (start >= 0 && end > start)
@@ -650,8 +679,11 @@ void EnsureModel(Fn<void()> done) {
 		return Network()->get(request);
 	};
 	const auto version = get(u"version.txt"_q);
-	QObject::connect(version, &QNetworkReply::finished, [=] {
+	QObject::connect(version, &QNetworkReply::finished, version, [=] {
 		version->deleteLater();
+		if (Core::Quitting()) {
+			return;
+		}
 		const auto remote = QString::fromUtf8(version->readAll()).trimmed();
 		if (version->error() != QNetworkReply::NoError || remote.isEmpty()) {
 			done();
@@ -663,8 +695,11 @@ void EnsureModel(Fn<void()> done) {
 			return;
 		}
 		const auto meta = get(kMetaFile);
-		QObject::connect(meta, &QNetworkReply::finished, [=] {
+		QObject::connect(meta, &QNetworkReply::finished, meta, [=] {
 			meta->deleteLater();
+			if (Core::Quitting()) {
+				return;
+			}
 			const auto metaBytes = meta->readAll();
 			if (meta->error() != QNetworkReply::NoError
 				|| !QJsonDocument::fromJson(metaBytes).isObject()) {
@@ -672,8 +707,11 @@ void EnsureModel(Fn<void()> done) {
 				return;
 			}
 			const auto vectors = get(kVectorsFile);
-			QObject::connect(vectors, &QNetworkReply::finished, [=] {
+			QObject::connect(vectors, &QNetworkReply::finished, vectors, [=] {
 				vectors->deleteLater();
+				if (Core::Quitting()) {
+					return;
+				}
 				const auto bytes = vectors->readAll();
 				if (vectors->error() == QNetworkReply::NoError
 					&& bytes.startsWith("PK")
@@ -687,7 +725,8 @@ void EnsureModel(Fn<void()> done) {
 						Config::Instance().setString(
 							u"guard_model_version"_q,
 							remote);
-						Loaded() = Model();
+						QMutexLocker lock(&ModelMutex());
+						LoadedSnapshot().reset();
 					}
 				}
 				done();
@@ -775,8 +814,8 @@ void Scan(const QString &path, Fn<void(Report)> done) {
 			const auto stats = ScanVectors(chunks);
 			report.modelUsed = stats.used;
 			report.modelVersion = String(u"guard_model_version"_q);
-			report.cleanVectors = Loaded().clean.rows;
-			report.malwareVectors = Loaded().malware.rows;
+			report.cleanVectors = stats.cleanRows;
+			report.malwareVectors = stats.malwareRows;
 			report.meanSimilarity = stats.meanAvg;
 			report.minSimilarity = stats.minAvg;
 			report.maxMalwareSimilarity = stats.maxMalware;

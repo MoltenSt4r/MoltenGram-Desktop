@@ -18,10 +18,12 @@
 #include <QtCore/QJsonArray>
 #include <QtCore/QJsonDocument>
 #include <QtCore/QJsonObject>
+#include <QtCore/QThread>
 #include <QtCore/QTimer>
 #include <QtGui/QFontMetrics>
 #include <QtGui/QGuiApplication>
 #include <QtGui/QPainter>
+#include <QtGui/QScreen>
 #include <QtWidgets/QLabel>
 #include <QtWidgets/QLineEdit>
 #include <QtWidgets/QPushButton>
@@ -84,6 +86,35 @@ QMutex MetricsMutex;
 double DpScale = 0.;
 int WidthPx = 0;
 int HeightPx = 0;
+QString CachedFontFamily;
+int64 CachedColorFg = 0xFF000000;
+int64 CachedColorSub = 0xFF888888;
+int64 CachedColorActive = 0xFF40A7E3;
+int64 CachedColorBg = 0xFFFFFFFF;
+bool PaletteHooked = false;
+
+[[nodiscard]] bool IsMainGuiThread() {
+	return !qApp || (QThread::currentThread() == qApp->thread());
+}
+
+[[nodiscard]] int64 PackColor(const QColor &c) {
+	return int64((uint32(c.alpha()) << 24)
+		| (uint32(c.red()) << 16)
+		| (uint32(c.green()) << 8)
+		| uint32(c.blue()));
+}
+
+void RefreshThemeCacheOnMain() {
+	if (!IsMainGuiThread()) {
+		return;
+	}
+	QMutexLocker lock(&MetricsMutex);
+	CachedColorFg = PackColor(st::windowFg->c);
+	CachedColorSub = PackColor(st::windowSubTextFg->c);
+	CachedColorActive = PackColor(st::windowActiveTextFg->c);
+	CachedColorBg = PackColor(st::windowBg->c);
+	CachedFontFamily = QGuiApplication::font().family();
+}
 
 [[nodiscard]] Window::SessionController *ActiveController() {
 	if (const auto window = Core::App().activePrimaryWindow()) {
@@ -100,10 +131,13 @@ public:
 
 protected:
 	void mouseReleaseEvent(QMouseEvent *event) override {
+		const auto alive = QPointer<ClickLabel>(this);
 		if (rect().contains(event->pos()) && handler) {
 			handler();
 		}
-		QLabel::mouseReleaseEvent(event);
+		if (alive) {
+			QLabel::mouseReleaseEvent(event);
+		}
 	}
 
 };
@@ -273,13 +307,15 @@ void ApplyCommon(QWidget *widget, const QJsonObject &node) {
 		type).arg(id).arg(node.value(u"children"_q).toArray().size()));
 	if (type == u"scrollview"_q) {
 		auto area = new Ui::ScrollArea(parent);
-		const auto inner = BuildNode(
-			node.value(u"children"_q).toArray().at(0)
-				.toObject().value(u"view"_q).toObject(),
-			nullptr);
-		if (inner) {
-			area->setWidget(inner);
-			area->setWidgetResizable(true);
+		const auto children = node.value(u"children"_q).toArray();
+		if (!children.isEmpty()) {
+			const auto inner = BuildNode(
+				children.at(0).toObject().value(u"view"_q).toObject(),
+				nullptr);
+			if (inner) {
+				area->setWidget(inner);
+				area->setWidgetResizable(true);
+			}
 		}
 		area->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
 		ApplyCommon(area, node);
@@ -647,11 +683,11 @@ void ApplyUpdate(const QJsonObject &payload) {
 		const auto old = widget->layout();
 		auto items = std::vector<QPair<QWidget*, QMargins>>();
 		if (old) {
-			for (auto i = 0; i != old->count(); ++i) {
-				const auto item = old->takeAt(0);
-				if (item->widget()) {
-					items.emplace_back(item->widget(), item->widget()->contentsMargins());
+			while (const auto item = old->takeAt(0)) {
+				if (const auto w = item->widget()) {
+					items.emplace_back(w, w->contentsMargins());
 				}
+				delete item;
 			}
 			delete old;
 		}
@@ -679,20 +715,44 @@ void ApplyUpdate(const QJsonObject &payload) {
 }
 
 void EnsureMetrics() {
-	QMutexLocker lock(&MetricsMutex);
-	if (DpScale > 0.) {
+	if (IsMainGuiThread()) {
+		RefreshThemeCacheOnMain();
+		QMutexLocker lock(&MetricsMutex);
+		if (!PaletteHooked && qApp) {
+			PaletteHooked = true;
+			style::PaletteChanged(
+			) | rpl::on_next([] {
+				RefreshThemeCacheOnMain();
+			}, *(new rpl::lifetime()));
+		}
+		if (DpScale > 0.) {
+			return;
+		}
+		const auto window = Core::App().activePrimaryWindow();
+		const auto screen = QGuiApplication::primaryScreen();
+		const auto size = screen ? screen->availableSize() : QSize(1080, 1920);
+		const auto usable = window
+			? window->widget()->size()
+			: size;
+		DpScale = style::ConvertScale(100) / 100.;
+		WidthPx = std::min(usable.width(), size.width());
+		HeightPx = std::min(usable.height(), size.height());
 		return;
 	}
-	const auto window = Core::App().activePrimaryWindow();
-	const auto screen = QGuiApplication::primaryScreen();
-	const auto size = screen ? screen->availableSize() : QSize(1080, 1920);
-	const auto usable = window ? window->widget()->size() : size;
-	DpScale = style::ConvertScale(100) / 100.;
-	WidthPx = std::min(usable.width(), size.width());
-	HeightPx = std::min(usable.height(), size.height());
+	QMutexLocker lock(&MetricsMutex);
+	if (DpScale <= 0.) {
+		DpScale = 1.;
+		WidthPx = 1080;
+		HeightPx = 1920;
+	}
 }
 
 void PaintOps(QPainter &p, const QJsonArray &ops) {
+	auto baseFamily = QString();
+	{
+		QMutexLocker lock(&MetricsMutex);
+		baseFamily = CachedFontFamily;
+	}
 	for (const auto &value : ops) {
 		const auto op = value.toObject();
 		const auto paint = op.value(u"paint"_q).toObject();
@@ -710,6 +770,9 @@ void PaintOps(QPainter &p, const QJsonArray &ops) {
 		const auto name = op.value(u"op"_q).toString();
 		if (name == u"rrect"_q) {
 			const auto rect = op.value(u"rect"_q).toArray();
+			if (rect.size() < 4) {
+				continue;
+			}
 			p.drawRoundedRect(
 				QRectF(
 					rect[0].toDouble(), rect[1].toDouble(),
@@ -719,6 +782,9 @@ void PaintOps(QPainter &p, const QJsonArray &ops) {
 				op.value(u"ry"_q).toDouble());
 		} else if (name == u"rect"_q) {
 			const auto rect = op.value(u"rect"_q).toArray();
+			if (rect.size() < 4) {
+				continue;
+			}
 			p.drawRect(QRectF(
 				rect[0].toDouble(), rect[1].toDouble(),
 				rect[2].toDouble() - rect[0].toDouble(),
@@ -731,11 +797,17 @@ void PaintOps(QPainter &p, const QJsonArray &ops) {
 		} else if (name == u"line"_q) {
 			const auto from = op.value(u"from"_q).toArray();
 			const auto to = op.value(u"to"_q).toArray();
+			if (from.size() < 2 || to.size() < 2) {
+				continue;
+			}
 			p.drawLine(
 				QPointF(from[0].toDouble(), from[1].toDouble()),
 				QPointF(to[0].toDouble(), to[1].toDouble()));
 		} else if (name == u"arc"_q) {
 			const auto rect = op.value(u"rect"_q).toArray();
+			if (rect.size() < 4) {
+				continue;
+			}
 			p.drawArc(
 				QRectF(
 					rect[0].toDouble(), rect[1].toDouble(),
@@ -744,8 +816,10 @@ void PaintOps(QPainter &p, const QJsonArray &ops) {
 				int(op.value(u"start"_q).toDouble() * 16.),
 				int(op.value(u"sweep"_q).toDouble() * 16.));
 		} else if (name == u"text"_q) {
-			auto font = QGuiApplication::font();
-			font.setPixelSize(int(paint.value(u"text_size"_q).toDouble(16.)));
+			auto font = IsMainGuiThread()
+				? QGuiApplication::font()
+				: (baseFamily.isEmpty() ? QFont() : QFont(baseFamily));
+			font.setPixelSize(std::max(1, int(paint.value(u"text_size"_q).toDouble(16.))));
 			font.setBold(paint.value(u"bold"_q).toBool(false));
 			p.setFont(font);
 			p.setPen(color);
@@ -774,20 +848,20 @@ void PaintOps(QPainter &p, const QJsonArray &ops) {
 }
 
 [[nodiscard]] int64 ColorByName(const QString &name) {
-	const auto mapped = (name == u"windowFg"_q)
-		? st::windowFg
-		: (name == u"windowSubFg"_q)
-		? st::windowSubTextFg
-		: (name == u"windowActiveTextFg"_q)
-		? st::windowActiveTextFg
-		: (name == u"windowBg"_q)
-		? st::windowBg
-		: st::windowFg;
-	const auto c = mapped->c;
-	return int64((uint32(c.alpha()) << 24)
-		| (uint32(c.red()) << 16)
-		| (uint32(c.green()) << 8)
-		| uint32(c.blue()));
+	if (IsMainGuiThread()) {
+		RefreshThemeCacheOnMain();
+	}
+	QMutexLocker lock(&MetricsMutex);
+	if (name == u"windowFg"_q) {
+		return CachedColorFg;
+	} else if (name == u"windowSubFg"_q) {
+		return CachedColorSub;
+	} else if (name == u"windowActiveTextFg"_q) {
+		return CachedColorActive;
+	} else if (name == u"windowBg"_q) {
+		return CachedColorBg;
+	}
+	return CachedColorFg;
 }
 
 } // namespace
@@ -798,21 +872,32 @@ bool FillBox(not_null<Ui::GenericBox*> box, int64 id, const QJsonObject &rootJso
 	if (!root) {
 		return false;
 	}
+	if (const auto it = Sheets.find(id); it != Sheets.end() && it->second.close) {
+		it->second.close();
+	}
 	Sheets[id].root = root;
 	auto holder = object_ptr<SheetHolder>(new SheetHolder(box));
 	const auto holderRaw = holder.data();
 	holderRaw->setContent(root);
 	box->addRow(std::move(holder), QMargins());
 	Sheets[id].holder = holderRaw;
+	const auto boxGuard = QPointer<Ui::GenericBox>(box.get());
 	Sheets[id].close = crl::guard(holderRaw, [=] {
-		box->closeBox();
+		if (boxGuard) {
+			boxGuard->closeBox();
+		}
 	});
 	QObject::connect(holderRaw, &QObject::destroyed, [=] {
-		Extera::Plugins::Call(u"event"_q, QJsonObject{
-			{ u"type"_q, u"sheet_closed"_q },
-			{ u"id"_q, double(id) },
-		});
-		Sheets.erase(id);
+		if (!Core::Quitting()) {
+			Extera::Plugins::Call(u"event"_q, QJsonObject{
+				{ u"type"_q, u"sheet_closed"_q },
+				{ u"id"_q, double(id) },
+			});
+		}
+		if (const auto it = Sheets.find(id);
+				it != Sheets.end() && it->second.holder == holderRaw) {
+			Sheets.erase(it);
+		}
 	});
 	return true;
 }
@@ -823,41 +908,60 @@ void ShowSheet(const QString &payload) {
 	const auto rootJson = data.value(u"root"_q).toObject();
 	const auto title = data.value(u"title"_q).toString();
 	crl::on_main([=] {
+		if (Core::Quitting()) {
+			return;
+		}
 		const auto controller = ActiveController();
 		if (!controller) {
 			return;
 		}
 		EnsureMetrics();
-		auto root = BuildNode(rootJson, nullptr);
-		if (!root) {
-			return;
+		if (const auto it = Sheets.find(id); it != Sheets.end() && it->second.close) {
+			it->second.close();
 		}
-		Sheets[id].root = root;
 		const auto width = SheetWidth();
 		controller->show(Box([=](not_null<Ui::GenericBox*> box) {
+			auto root = BuildNode(rootJson, nullptr);
+			if (!root) {
+				crl::on_main(box, [=] { box->closeBox(); });
+				return;
+			}
 			box->setNoContentMargin(true);
 			box->setWidth(width);
 			if (!title.isEmpty()) {
 				box->setTitle(rpl::single(title));
 			}
+			Sheets[id].root = root;
 			auto holder = object_ptr<SheetHolder>(new SheetHolder(box));
 			const auto holderRaw = holder.data();
 			holderRaw->setContent(root);
 			box->addRow(std::move(holder), QMargins());
 			Sheets[id].holder = holderRaw;
+			const auto boxGuard = QPointer<Ui::GenericBox>(box.get());
 			Sheets[id].close = crl::guard(holderRaw, [=] {
-				box->closeBox();
+				if (boxGuard) {
+					boxGuard->closeBox();
+				}
 			});
 			QObject::connect(holderRaw, &QObject::destroyed, [=] {
 				LOG(("PluginViews: sheet holder destroyed id=%1").arg(id));
-				Extera::Plugins::Call(u"event"_q, QJsonObject{
-					{ u"type"_q, u"sheet_closed"_q },
-					{ u"id"_q, double(id) },
-				});
-				Sheets.erase(id);
+				if (!Core::Quitting()) {
+					Extera::Plugins::Call(u"event"_q, QJsonObject{
+						{ u"type"_q, u"sheet_closed"_q },
+						{ u"id"_q, double(id) },
+					});
+				}
+				if (const auto it = Sheets.find(id);
+						it != Sheets.end() && it->second.holder == holderRaw) {
+					Sheets.erase(it);
+				}
 			});
+			const auto rootGuard = QPointer<QWidget>(root);
 			for (const auto delay : { 100, 1000, 4000 }) {
 				QTimer::singleShot(delay, crl::guard(holderRaw, [=] {
+					if (!rootGuard || !holderRaw->window()) {
+						return;
+					}
 					LOG(("PluginViews: sheet check id=%1 delay=%2"
 						" holder=%3x%4 pos=%5,%6 visible=%7 root=%8x%9"
 						" window=%10x%11").arg(
@@ -868,8 +972,8 @@ void ShowSheet(const QString &payload) {
 						).arg(holderRaw->x()
 						).arg(holderRaw->y()
 						).arg(holderRaw->isVisible()
-						).arg(root->width()
-						).arg(root->height()
+						).arg(rootGuard->width()
+						).arg(rootGuard->height()
 						).arg(holderRaw->window()->width()
 						).arg(holderRaw->window()->height()));
 				}));
@@ -919,7 +1023,15 @@ void RenderCanvas(int64 id, int width, int height, const QString &ops) {
 }
 
 double MeasureText(const QString &text, int sizePx, bool bold) {
-	auto font = QGuiApplication::font();
+	EnsureMetrics();
+	auto baseFamily = QString();
+	{
+		QMutexLocker lock(&MetricsMutex);
+		baseFamily = CachedFontFamily;
+	}
+	auto font = IsMainGuiThread()
+		? QGuiApplication::font()
+		: (baseFamily.isEmpty() ? QFont() : QFont(baseFamily));
 	font.setPixelSize(std::max(1, sizePx));
 	font.setBold(bold);
 	return QFontMetricsF(font).horizontalAdvance(text);
@@ -927,16 +1039,20 @@ double MeasureText(const QString &text, int sizePx, bool bold) {
 
 QString UiMetrics() {
 	EnsureMetrics();
-	QJsonObject data;
+	auto dp = 1.;
+	auto w = 400;
+	auto h = 1920;
 	{
 		QMutexLocker lock(&MetricsMutex);
-		data = QJsonObject{
-			{ u"dp"_q, DpScale },
-			{ u"width"_q, SheetWidth() },
-			{ u"height"_q, HeightPx },
-		};
+		dp = DpScale;
+		w = std::clamp(WidthPx - 48, 360, 480);
+		h = HeightPx;
 	}
-	return QJsonDocument(data).toJson(QJsonDocument::Compact);
+	return QJsonDocument(QJsonObject{
+		{ u"dp"_q, dp },
+		{ u"width"_q, w },
+		{ u"height"_q, h },
+	}).toJson(QJsonDocument::Compact);
 }
 
 int64 ThemeColor(const QString &name) {

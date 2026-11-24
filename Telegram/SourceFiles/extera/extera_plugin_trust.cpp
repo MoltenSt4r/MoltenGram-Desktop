@@ -70,7 +70,7 @@ void Download(
 		location,
 		MTP_long(offset),
 		MTP_int(kChunk)
-	)).done([=](const MTPupload_File &result) mutable {
+	)).done(crl::guard(session, [=](const MTPupload_File &result) mutable {
 		auto part = QByteArray();
 		result.match([&](const MTPDupload_file &data) {
 			part = qba(data.vbytes());
@@ -82,9 +82,9 @@ void Download(
 		} else {
 			done(collected);
 		}
-	}).fail([=] {
+	})).fail(crl::guard(session, [=] {
 		done(QByteArray());
-	}).toDC(MTP::downloadDcId(document->exdDcId(), 0)).send();
+	})).toDC(MTP::downloadDcId(document->exdDcId(), 0)).send();
 }
 
 void CheckCandidate(
@@ -134,7 +134,7 @@ void Search(
 		MTP_int(0),
 		MTP_int(0),
 		MTP_long(0)
-	)).done([=](const MTPmessages_Messages &result) {
+	)).done(crl::guard(session, [=](const MTPmessages_Messages &result) {
 		const auto owner = &session->data();
 		result.match([](const MTPDmessages_messagesNotModified &) {
 		}, [&](const auto &data) {
@@ -160,9 +160,9 @@ void Search(
 			}
 		});
 		Release(state);
-	}).fail([=] {
+	})).fail(crl::guard(session, [=] {
 		Release(state);
-	}).send();
+	})).send();
 }
 
 } // namespace
@@ -250,7 +250,7 @@ void Verify(
 				MTP_flags(0),
 				MTP_string(source.username),
 				MTP_string()
-			)).done([=](const MTPcontacts_ResolvedPeer &result) {
+			)).done(crl::guard(session, [=](const MTPcontacts_ResolvedPeer &result) {
 				session->data().processUsers(result.data().vusers());
 				session->data().processChats(result.data().vchats());
 				if (const auto channel = session->data().channelLoaded(id)) {
@@ -258,9 +258,9 @@ void Verify(
 					Search(session, state, channel, QString());
 				}
 				Release(state);
-			}).fail([=] {
+			})).fail(crl::guard(session, [=] {
 				Release(state);
-			}).send();
+			})).send();
 		}
 	}
 	Release(state);
@@ -277,7 +277,7 @@ void VerifyForward(
 		MTP_vector<MTPInputMessage>(
 			1,
 			MTP_inputMessageID(MTP_int(id.bare)))
-	)).done([=](const MTPmessages_Messages &result) {
+	)).done(crl::guard(session, [=](const MTPmessages_Messages &result) {
 		auto found = false;
 		result.match([](const MTPDmessages_messagesNotModified &) {
 		}, [&](const auto &data) {
@@ -301,9 +301,9 @@ void VerifyForward(
 			}
 		});
 		done(found);
-	}).fail([=] {
+	})).fail(crl::guard(session, [=] {
 		done(false);
-	}).send();
+	})).send();
 }
 
 } // namespace Extera::PluginTrust

@@ -49,8 +49,8 @@ struct State {
 };
 
 State &Instance() {
-	static auto result = State();
-	return result;
+	static auto *const result = new State();
+	return *result;
 }
 
 [[nodiscard]] std::vector<int> Parse(QString version) {
@@ -142,9 +142,12 @@ void Download(bool install) {
 		QNetworkRequest::RedirectPolicyAttribute,
 		QNetworkRequest::NoLessSafeRedirectPolicy);
 	const auto reply = state.manager->get(request);
-	QObject::connect(reply, &QNetworkReply::downloadProgress, [=](
+	QObject::connect(reply, &QNetworkReply::downloadProgress, reply, [=](
 			qint64 received,
 			qint64 total) {
+		if (Core::Quitting()) {
+			return;
+		}
 		if (total > 0) {
 			Instance().progress = std::clamp(
 				float64(received) / float64(total),
@@ -152,8 +155,11 @@ void Download(bool install) {
 				0.99);
 		}
 	});
-	QObject::connect(reply, &QNetworkReply::finished, [=] {
+	QObject::connect(reply, &QNetworkReply::finished, reply, [=] {
 		reply->deleteLater();
+		if (Core::Quitting()) {
+			return;
+		}
 		auto &state = Instance();
 		state.downloading = false;
 		if (reply->error() != QNetworkReply::NoError) {
@@ -258,8 +264,11 @@ void Check(Fn<void(CheckResult)> done = nullptr) {
 	request.setRawHeader("Accept", "application/vnd.github+json");
 	request.setRawHeader("User-Agent", "MoltenGram-Desktop");
 	const auto reply = state.manager->get(request);
-	QObject::connect(reply, &QNetworkReply::finished, [=] {
+	QObject::connect(reply, &QNetworkReply::finished, reply, [=] {
 		reply->deleteLater();
+		if (Core::Quitting()) {
+			return;
+		}
 		if (reply->error() != QNetworkReply::NoError) {
 			if (done) {
 				done(CheckResult::Failed);

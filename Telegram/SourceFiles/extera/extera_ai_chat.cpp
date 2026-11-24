@@ -1,6 +1,7 @@
 #include "extera/extera_ai_chat.h"
 
 #include "base/unixtime.h"
+#include "core/application.h"
 #include "extera/exd_ai_chat_section.h"
 #include "extera/extera_config.h"
 #include "lang/lang_keys.h"
@@ -145,8 +146,9 @@ struct Message {
 
 [[nodiscard]] QString ErrorFrom(const QByteArray &data) {
 	const auto document = QJsonDocument::fromJson(data);
-	const auto object = document.isArray()
-		? document.array().first().toObject()
+	const auto array = document.isArray() ? document.array() : QJsonArray();
+	const auto object = !array.isEmpty()
+		? array.first().toObject()
 		: document.object();
 	const auto errorObj = object.value(u"error"_q);
 	if (errorObj.isObject()) {
@@ -293,12 +295,18 @@ void RequestGemini(
 				progress(*text);
 			}
 		};
-		QObject::connect(reply, &QNetworkReply::readyRead, [=] {
+		QObject::connect(reply, &QNetworkReply::readyRead, reply, [=] {
+			if (Core::Quitting()) {
+				return;
+			}
 			buffer->append(reply->readAll());
 			parse();
 		});
-		QObject::connect(reply, &QNetworkReply::finished, [=] {
+		QObject::connect(reply, &QNetworkReply::finished, reply, [=] {
 			reply->deleteLater();
+			if (Core::Quitting()) {
+				return;
+			}
 			buffer->append(reply->readAll());
 			buffer->append('\n');
 			parse();
@@ -313,8 +321,11 @@ void RequestGemini(
 		});
 		return;
 	}
-	QObject::connect(reply, &QNetworkReply::finished, [=] {
+	QObject::connect(reply, &QNetworkReply::finished, reply, [=] {
 		reply->deleteLater();
+		if (Core::Quitting()) {
+			return;
+		}
 		const auto data = reply->readAll();
 		const auto object = QJsonDocument::fromJson(data).object();
 		const auto candidates = object.value(u"candidates"_q).toArray();
@@ -456,12 +467,18 @@ void RequestOpenAICompat(
 				}
 			}
 		};
-		QObject::connect(reply, &QNetworkReply::readyRead, [=] {
+		QObject::connect(reply, &QNetworkReply::readyRead, reply, [=] {
+			if (Core::Quitting()) {
+				return;
+			}
 			buffer->append(reply->readAll());
 			parse();
 		});
-		QObject::connect(reply, &QNetworkReply::finished, [=] {
+		QObject::connect(reply, &QNetworkReply::finished, reply, [=] {
 			reply->deleteLater();
+			if (Core::Quitting()) {
+				return;
+			}
 			buffer->append(reply->readAll());
 			buffer->append('\n');
 			parse();
@@ -477,8 +494,11 @@ void RequestOpenAICompat(
 		return;
 	}
 
-	QObject::connect(reply, &QNetworkReply::finished, [=] {
+	QObject::connect(reply, &QNetworkReply::finished, reply, [=] {
 		reply->deleteLater();
+		if (Core::Quitting()) {
+			return;
+		}
 		const auto bytes = reply->readAll();
 		const auto doc = QJsonDocument::fromJson(bytes);
 		if (doc.isObject()) {
@@ -758,8 +778,11 @@ void Transcribe(
 		} },
 	}).toJson(QJsonDocument::Compact);
 	const auto reply = chat.manager->post(request, body);
-	QObject::connect(reply, &QNetworkReply::finished, [=] {
+	QObject::connect(reply, &QNetworkReply::finished, reply, [=] {
 		reply->deleteLater();
+		if (Core::Quitting()) {
+			return;
+		}
 		const auto bytes = reply->readAll();
 		const auto object = QJsonDocument::fromJson(bytes).object();
 		const auto candidates = object.value(u"candidates"_q).toArray();

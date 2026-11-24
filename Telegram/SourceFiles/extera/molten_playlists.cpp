@@ -235,6 +235,7 @@ constexpr auto kChannelDialogBase = qint64(1000000000000LL);
 }
 
 struct ActiveQueue {
+	base::weak_ptr<Main::Session> session;
 	QString playlistId;
 	std::vector<AudioMsgId> tracks;
 	int index = -1;
@@ -250,6 +251,7 @@ struct ActiveQueue {
 void ClearActiveQueue() {
 	auto &queue = Queue();
 	queue.lifetime.destroy();
+	queue.session = nullptr;
 	queue.playlistId.clear();
 	queue.tracks.clear();
 	queue.index = -1;
@@ -258,7 +260,8 @@ void ClearActiveQueue() {
 
 bool PlayQueueIndex(int targetIndex) {
 	auto &queue = Queue();
-	if (queue.tracks.empty()
+	if (!queue.session
+		|| queue.tracks.empty()
 		|| targetIndex < 0
 		|| targetIndex >= int(queue.tracks.size())) {
 		return false;
@@ -280,7 +283,8 @@ void InstallQueueHooks() {
 		rpl::mappers::_1 == AudioMsgId::Type::Song
 	) | rpl::on_next([] {
 		auto &q = Queue();
-		if (q.tracks.empty() || q.index < 0) {
+		if (!q.session || q.tracks.empty() || q.index < 0) {
+			ClearActiveQueue();
 			return;
 		}
 		const auto &settings = Core::App().settings();
@@ -313,6 +317,10 @@ void InstallQueueHooks() {
 		rpl::mappers::_1 == AudioMsgId::Type::Song
 	) | rpl::on_next([] {
 		auto &q = Queue();
+		if (!q.session) {
+			ClearActiveQueue();
+			return;
+		}
 		if (q.switching || q.tracks.empty()) {
 			return;
 		}
@@ -847,6 +855,7 @@ void PlayPlaylist(
 	}
 
 	auto &queue = Queue();
+	queue.session = base::make_weak(&controller->session());
 	queue.playlistId = pl->id;
 	queue.tracks = std::move(resolved);
 	InstallQueueHooks();
@@ -854,11 +863,20 @@ void PlayPlaylist(
 }
 
 bool HasActiveQueue() {
-	return !Queue().tracks.empty() && Queue().index >= 0;
+	auto &queue = Queue();
+	if (!queue.session) {
+		ClearActiveQueue();
+		return false;
+	}
+	return !queue.tracks.empty() && queue.index >= 0;
 }
 
 bool PlayNext() {
 	auto &queue = Queue();
+	if (!queue.session) {
+		ClearActiveQueue();
+		return false;
+	}
 	if (queue.tracks.empty() || queue.index < 0) {
 		return false;
 	}
@@ -877,6 +895,10 @@ bool PlayNext() {
 
 bool PlayPrevious() {
 	auto &queue = Queue();
+	if (!queue.session) {
+		ClearActiveQueue();
+		return false;
+	}
 	if (queue.tracks.empty() || queue.index < 0) {
 		return false;
 	}
@@ -1000,6 +1022,8 @@ void ShowPlaylistDetailsBox(
 			});
 		}
 
+		const auto weakBox = base::make_weak(box.get());
+		const auto weakController = base::make_weak(controller);
 		Settings::AddButtonWithIcon(
 			container,
 			rpl::single(u"Export .mplaylist (JSON)"_q),
@@ -1023,9 +1047,11 @@ void ShowPlaylistDetailsBox(
 						result += u".mplaylist"_q;
 					}
 					const auto ok = ExportJson(*current, result);
-					controller->showToast(ok
-						? u"Playlist exported"_q
-						: u"Failed to export playlist"_q);
+					if (const auto strong = weakController.get()) {
+						strong->showToast(ok
+							? u"Playlist exported"_q
+							: u"Failed to export playlist"_q);
+					}
 				});
 		});
 
@@ -1052,9 +1078,11 @@ void ShowPlaylistDetailsBox(
 						result += u".m3u8"_q;
 					}
 					const auto ok = ExportM3U8(*current, result);
-					controller->showToast(ok
-						? u"Playlist exported"_q
-						: u"Failed to export playlist"_q);
+					if (const auto strong = weakController.get()) {
+						strong->showToast(ok
+							? u"Playlist exported"_q
+							: u"Failed to export playlist"_q);
+					}
 				});
 		});
 
@@ -1070,7 +1098,9 @@ void ShowPlaylistDetailsBox(
 			}
 			box->closeBox();
 			ShowRenamePlaylistBox(controller, *current, [=] {
-				ShowPlaylistDetailsBox(controller, playlistId);
+				if (const auto strong = weakController.get()) {
+					ShowPlaylistDetailsBox(strong, playlistId);
+				}
 			});
 		});
 
@@ -1084,9 +1114,13 @@ void ShowPlaylistDetailsBox(
 				.text = u"Delete playlist \"%1\"?"_q.arg(pl.name),
 				.confirmed = [=](Fn<void()> close) {
 					Store::Instance().deletePlaylist(playlistId);
-					controller->showToast(u"Playlist deleted"_q);
+					if (const auto strong = weakController.get()) {
+						strong->showToast(u"Playlist deleted"_q);
+					}
 					close();
-					box->closeBox();
+					if (weakBox) {
+						weakBox->closeBox();
+					}
 				},
 				.confirmText = tr::lng_box_delete(),
 				.confirmStyle = &st::attentionBoxButton,
@@ -1163,6 +1197,8 @@ void ShowPlaylistsBox(not_null<Window::SessionController*> controller) {
 			});
 		});
 
+		const auto weakBox = base::make_weak(box.get());
+		const auto weakController = base::make_weak(controller);
 		Settings::AddButtonWithIcon(
 			container,
 			rpl::single(u"Import Playlist (.mplaylist / .m3u8)"_q),
@@ -1178,15 +1214,22 @@ void ShowPlaylistsBox(not_null<Window::SessionController*> controller) {
 						return;
 					}
 					const auto imported = ImportFile(result.paths.front());
+					const auto strongController = weakController.get();
 					if (imported) {
-						controller->showToast(
-							u"Imported \"%1\" (%2 tracks)"_q
-								.arg(imported->name)
-								.arg(imported->tracks.size()));
-						box->closeBox();
-						ShowPlaylistDetailsBox(controller, imported->id);
-					} else {
-						controller->showToast(u"Failed to import playlist"_q);
+						if (strongController) {
+							strongController->showToast(
+								u"Imported \"%1\" (%2 tracks)"_q
+									.arg(imported->name)
+									.arg(imported->tracks.size()));
+						}
+						if (weakBox) {
+							weakBox->closeBox();
+						}
+						if (strongController) {
+							ShowPlaylistDetailsBox(strongController, imported->id);
+						}
+					} else if (strongController) {
+						strongController->showToast(u"Failed to import playlist"_q);
 					}
 				});
 		});

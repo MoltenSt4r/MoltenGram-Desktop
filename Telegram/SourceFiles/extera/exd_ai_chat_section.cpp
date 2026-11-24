@@ -782,10 +782,13 @@ void AiChatWidget::resizeEvent(QResizeEvent *e) {
 
 void AiChatWidget::updateControlsGeometry() {
 	const auto w = width();
+	if (w <= 0 || height() <= 0) {
+		return;
+	}
 	const auto md3 = style::Md3Enabled();
 	_topBar->setGeometry(0, 0, w, st::topBarHeight);
 	_menuToggle->moveToRight(0, 0, w);
-	if (_exdSettings) {
+	if (_exdSettings && _exdClear) {
 		_exdSettings->moveToRight(st::exdTopBarPlaqueMargins.right(), 0, w);
 		_exdClear->moveToRight(
 			st::exdTopBarPlaqueMargins.right() + _exdSettings->width(),
@@ -806,8 +809,10 @@ void AiChatWidget::updateControlsGeometry() {
 		? (side + st::exdAiComposerInner)
 		: style::ConvertScale(16);
 	const auto sendRight = md3 ? side : 0;
-	const auto fieldWidth = w - sendWidth - left - sendRight
-		- (md3 ? (st::exdAiComposerSkip + st::exdAiComposerInner) : 0);
+	const auto fieldWidth = std::max(
+		1,
+		w - sendWidth - left - sendRight
+			- (md3 ? (st::exdAiComposerSkip + st::exdAiComposerInner) : 0));
 	_field->resizeToWidth(fieldWidth);
 	const auto composerHeight = md3
 		? (std::max(
@@ -837,7 +842,7 @@ void AiChatWidget::updateControlsGeometry() {
 		w,
 		st::lineWidth);
 	const auto top = st::topBarHeight;
-	const auto scrollHeight = height() - top - composerHeight;
+	const auto scrollHeight = std::max(0, height() - top - composerHeight);
 	const auto atBottom = (_scroll->scrollTop() >= _scroll->scrollTopMax());
 	_scroll->setGeometry(0, top, w, scrollHeight);
 	if (_list) {

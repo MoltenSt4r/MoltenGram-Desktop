@@ -58,7 +58,8 @@ def _wheel_score(filename: str) -> int:
     python, abi, platform = tags if len(tags) == 3 else ("", "", "")
     if platform == "any" and abi == "none":
         return 3 if "py3" in python else 1
-    compatible = "cp311" in python or abi == "abi3"
+    py_tag = f"cp{sys.version_info.major}{sys.version_info.minor}"
+    compatible = py_tag in python or abi == "abi3"
     if not compatible:
         return -1
     import platform as _platform

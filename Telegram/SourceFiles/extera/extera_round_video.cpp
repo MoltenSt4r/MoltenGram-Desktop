@@ -16,6 +16,8 @@
 #include "styles/style_boxes.h"
 #include "styles/style_layers.h"
 
+#include <algorithm>
+
 extern "C" {
 #include <libavutil/audio_fifo.h>
 #include <libswresample/swresample.h>
@@ -40,6 +42,7 @@ struct Result {
 class Transcoder final {
 public:
 	explicit Transcoder(const QString &path);
+	~Transcoder();
 
 	[[nodiscard]] bool valid() const;
 	[[nodiscard]] QImage firstFrame();
@@ -84,6 +87,13 @@ private:
 	bool _finished = false;
 
 };
+
+Transcoder::~Transcoder() {
+	if (_fifo) {
+		av_audio_fifo_free(_fifo);
+		_fifo = nullptr;
+	}
+}
 
 Transcoder::Transcoder(const QString &path) {
 	_input.file.setFileName(path);
@@ -246,37 +256,51 @@ bool Transcoder::initAudioEncoder() {
 	if (!codec) {
 		return false;
 	}
-	_audioStream = avformat_new_stream(_result.get(), codec);
-	_audioEncoder = FFmpeg::CodecPointer(avcodec_alloc_context3(codec));
-	if (!_audioStream || !_audioEncoder) {
+	auto encoder = FFmpeg::CodecPointer(avcodec_alloc_context3(codec));
+	if (!encoder) {
 		return false;
 	}
-	_audioEncoder->sample_fmt = AV_SAMPLE_FMT_FLTP;
-	_audioEncoder->bit_rate = kAudioBitRate;
-	_audioEncoder->sample_rate = kAudioFrequency;
-	_audioEncoder->ch_layout = AV_CHANNEL_LAYOUT_MONO;
-	_audioEncoder->time_base = AVRational{ 1, kAudioFrequency };
+	encoder->sample_fmt = AV_SAMPLE_FMT_FLTP;
+	encoder->bit_rate = kAudioBitRate;
+	encoder->sample_rate = kAudioFrequency;
+	encoder->ch_layout = AV_CHANNEL_LAYOUT_MONO;
+	encoder->time_base = AVRational{ 1, kAudioFrequency };
 	if (_result->oformat->flags & AVFMT_GLOBALHEADER) {
-		_audioEncoder->flags |= AV_CODEC_FLAG_GLOBAL_HEADER;
+		encoder->flags |= AV_CODEC_FLAG_GLOBAL_HEADER;
 	}
-	if (avcodec_open2(_audioEncoder.get(), codec, nullptr) < 0
-		|| avcodec_parameters_from_context(
-			_audioStream->codecpar,
-			_audioEncoder.get()) < 0) {
+	if (avcodec_open2(encoder.get(), codec, nullptr) < 0) {
 		return false;
 	}
-	_resampler = FFmpeg::MakeSwresamplePointer(
+	auto resampler = FFmpeg::MakeSwresamplePointer(
 		&_audioDecoder->ch_layout,
 		_audioDecoder->sample_fmt,
 		_audioDecoder->sample_rate,
-		&_audioEncoder->ch_layout,
-		_audioEncoder->sample_fmt,
-		_audioEncoder->sample_rate);
-	_fifo = av_audio_fifo_alloc(
-		_audioEncoder->sample_fmt,
+		&encoder->ch_layout,
+		encoder->sample_fmt,
+		encoder->sample_rate);
+	if (!resampler) {
+		return false;
+	}
+	const auto fifoSamples = std::max(1, encoder->frame_size);
+	const auto fifo = av_audio_fifo_alloc(
+		encoder->sample_fmt,
 		1,
-		_audioEncoder->frame_size);
-	return _resampler && _fifo;
+		fifoSamples);
+	if (!fifo) {
+		return false;
+	}
+	const auto stream = avformat_new_stream(_result.get(), codec);
+	if (!stream || avcodec_parameters_from_context(
+			stream->codecpar,
+			encoder.get()) < 0) {
+		av_audio_fifo_free(fifo);
+		return false;
+	}
+	_audioEncoder = std::move(encoder);
+	_resampler = std::move(resampler);
+	_fifo = fifo;
+	_audioStream = stream;
+	return true;
 }
 
 bool Transcoder::encode(
@@ -380,7 +404,13 @@ void Transcoder::writeAudio(not_null<AVFrame*> frame) {
 }
 
 void Transcoder::drainAudio() {
+	if (!_fifo || !_audioEncoder) {
+		return;
+	}
 	const auto size = _audioEncoder->frame_size;
+	if (size <= 0) {
+		return;
+	}
 	while (av_audio_fifo_size(_fifo) >= size) {
 		auto frame = FFmpeg::MakeFramePointer();
 		frame->nb_samples = size;
@@ -462,9 +492,11 @@ void ShowCropBox(
 		const auto width = st::boxWideWidth
 			- st::boxRowPadding.left()
 			- st::boxRowPadding.right();
-		const auto height = std::min(
-			width * frame.height() / std::max(frame.width(), 1),
-			width);
+		const auto height = std::max(
+			1,
+			std::min(
+				width * frame.height() / std::max(frame.width(), 1),
+				width));
 		const auto shown = frame.scaled(
 			QSize(width, height) * style::DevicePixelRatio(),
 			Qt::KeepAspectRatio,
@@ -549,10 +581,12 @@ void ShowCropBox(
 			st::boxRowPadding);
 		box->addButton(tr::lng_send_button(), [=] {
 			const auto r = imageRect();
-			const auto side = state->side * std::min(r.width(), r.height());
+			const auto rw = std::max(1, r.width());
+			const auto rh = std::max(1, r.height());
+			const auto side = state->side * std::min(rw, rh);
 			const auto crop = QRectF(
-				state->center.x() - side / 2. / r.width(),
-				state->center.y() - side / 2. / r.height(),
+				state->center.x() - side / 2. / rw,
+				state->center.y() - side / 2. / rh,
 				state->side,
 				state->side);
 			box->closeBox();

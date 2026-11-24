@@ -210,6 +210,10 @@ void TriggerShot(Fn<void()> shown) {
 	}
 	shown();
 	base::call_delayed(crl::time(1000), [=] {
+		if (!Core::IsAppLaunched() || Core::Quitting()) {
+			active = false;
+			return;
+		}
 		if (!mode) {
 			ShotSwitching = true;
 			Config::Instance().setBool(u"streamer_mode"_q, mode);
@@ -382,8 +386,11 @@ void InjectKey(UINT vk, Qt::KeyboardModifiers modifiers) {
 	return result;
 }
 
+std::atomic<DWORD> HookThreadId = 0;
+std::atomic<bool> HookStopping = false;
+
 LRESULT CALLBACK LowLevelKeyboard(int code, WPARAM wParam, LPARAM lParam) {
-	if (code == HC_ACTION) {
+	if (code == HC_ACTION && !HookStopping.load() && lParam) {
 		const auto data = reinterpret_cast<KBDLLHOOKSTRUCT*>(lParam);
 		if (data->flags & LLKHF_INJECTED) {
 			return CallNextHookEx(nullptr, code, wParam, lParam);
@@ -396,11 +403,15 @@ LRESULT CALLBACK LowLevelKeyboard(int code, WPARAM wParam, LPARAM lParam) {
 			if (!name.isEmpty() && (pressed || (released && vk == VK_SNAPSHOT))) {
 				const auto text = ModifiersText(CurrentModifiers()) + name;
 				auto handled = false;
-				QMetaObject::invokeMethod(qApp, [&] {
-					if (const auto callback = CaptureCallback()) {
-						handled = callback(text);
-					}
-				}, Qt::BlockingQueuedConnection);
+				if (qApp && !HookStopping.load() && !Core::Quitting()) {
+					QMetaObject::invokeMethod(qApp, [&] {
+						if (!Core::Quitting()) {
+							if (const auto callback = CaptureCallback()) {
+								handled = callback(text);
+							}
+						}
+					}, Qt::BlockingQueuedConnection);
+				}
 				if (handled) {
 					return 1;
 				}
@@ -429,6 +440,9 @@ LRESULT CALLBACK LowLevelKeyboard(int code, WPARAM wParam, LPARAM lParam) {
 					key->swallowUp = true;
 					const auto modifiers = key->modifiers;
 					crl::on_main([=] {
+						if (Core::Quitting()) {
+							return;
+						}
 						TriggerShot([=] {
 							std::thread([=] {
 								Sleep(40);
@@ -437,7 +451,11 @@ LRESULT CALLBACK LowLevelKeyboard(int code, WPARAM wParam, LPARAM lParam) {
 						});
 					});
 				} else {
-					crl::on_main([] { ToggleByHotkey(); });
+					crl::on_main([] {
+						if (!Core::Quitting()) {
+							ToggleByHotkey();
+						}
+					});
 				}
 				return 1;
 			}
@@ -451,7 +469,10 @@ void EnsureHook() {
 	if (std::exchange(started, true)) {
 		return;
 	}
-	std::thread([] {
+	HookStopping = false;
+	static auto thread = std::make_shared<std::thread>();
+	*thread = std::thread([] {
+		HookThreadId = GetCurrentThreadId();
 		SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_TIME_CRITICAL);
 		const auto hook = SetWindowsHookExW(
 			WH_KEYBOARD_LL,
@@ -459,15 +480,30 @@ void EnsureHook() {
 			GetModuleHandleW(nullptr),
 			0);
 		if (!hook) {
+			HookThreadId = 0;
 			return;
 		}
 		auto message = MSG();
-		while (GetMessageW(&message, nullptr, 0, 0) > 0) {
+		while (!HookStopping.load() && GetMessageW(&message, nullptr, 0, 0) > 0) {
 			TranslateMessage(&message);
 			DispatchMessageW(&message);
 		}
 		UnhookWindowsHookEx(hook);
-	}).detach();
+		HookThreadId = 0;
+	});
+	if (qApp) {
+		QObject::connect(qApp, &QCoreApplication::aboutToQuit, [] {
+			HookStopping = true;
+			if (const auto tid = HookThreadId.load()) {
+				PostThreadMessageW(tid, WM_QUIT, 0, 0);
+			}
+			if (thread && thread->joinable()) {
+				thread->join();
+			}
+		});
+	} else {
+		thread->detach();
+	}
 }
 
 void RegisterOne(LowHotkey &slot, const QString &config) {
@@ -1186,11 +1222,15 @@ void Start() {
 
 void ShowMenu(not_null<Window::SessionController*> controller) {
 	static auto menu = base::unique_qptr<Ui::PopupMenu>();
+	const auto parent = controller->window().widget().get();
+	const auto weakController = base::make_weak(controller);
 	menu = base::make_unique_q<Ui::PopupMenu>(
-		QApplication::activeWindow(),
+		parent,
 		st::popupMenuWithIcons);
 	menu->addAction(tr::lng_extera_streamer_settings(tr::now), [=] {
-		ShowSettings(controller);
+		if (const auto strong = weakController.get()) {
+			ShowSettings(strong);
+		}
 	}, &st::menuIconSettings);
 	const auto full = Active() && Bool(u"streamer_full"_q);
 	menu->addAction(full
@@ -1377,9 +1417,14 @@ void ShowSettings(not_null<Window::SessionController*> controller) {
 			PaintPreview(p, preview->rect());
 		}, preview->lifetime());
 		const auto dirty = std::make_shared<bool>(false);
+		const auto weakPreview = QPointer<Ui::RpWidget>(preview);
+		const auto weakBox = base::make_weak(box.get());
+		const auto weakController = base::make_weak(controller);
 		const auto changed = [=] {
 			*dirty = true;
-			preview->update();
+			if (weakPreview) {
+				weakPreview->update();
+			}
 		};
 		box->boxClosing() | rpl::on_next([=] {
 			if (*dirty) {
@@ -1516,8 +1561,12 @@ void ShowSettings(not_null<Window::SessionController*> controller) {
 					}
 					SavePreset(name);
 					inner->closeBox();
-					box->closeBox();
-					ShowSettings(controller);
+					if (weakBox) {
+						weakBox->closeBox();
+					}
+					if (const auto strong = weakController.get()) {
+						ShowSettings(strong);
+					}
 				});
 				inner->addButton(tr::lng_cancel(), [=] {
 					inner->closeBox();
@@ -1636,7 +1685,9 @@ void ShowSettings(not_null<Window::SessionController*> controller) {
 				st::settingsButtonNoIcon,
 				rpl::duplicate(*shared));
 			button->setClickedCallback([=] {
-				ShowExceptionsBox(controller, key, shared, changed);
+				if (const auto strong = weakController.get()) {
+					ShowExceptionsBox(strong, key, shared, changed);
+				}
 			});
 		};
 		addExceptions(

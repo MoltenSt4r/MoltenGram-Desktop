@@ -950,9 +950,11 @@ void FetchPeerBotMetadataIfNeeded(
 	InFlightFetches().emplace(ownerBare);
 	++ActiveFetchCount;
 
-	const auto finish = [=] {
+	const auto cleanup = std::shared_ptr<void>(nullptr, [ownerBare](void*) {
 		--ActiveFetchCount;
 		InFlightFetches().remove(ownerBare);
+	});
+	const auto finish = [cleanup] {
 	};
 
 	const auto targetUsername = BuildBotUsername(ownerBare, seed);
@@ -1053,7 +1055,10 @@ void EnsureBotReady(
 	}
 	SetupInProgress().emplace(ownerId);
 
-	const auto finish = [=](BotSetupResult result) {
+	const auto cleanup = std::shared_ptr<void>(nullptr, [ownerId](void*) {
+		SetupInProgress().remove(ownerId);
+	});
+	const auto finish = [cleanup, ownerId, callback](BotSetupResult result) {
 		SetupInProgress().remove(ownerId);
 		if (callback) {
 			callback(std::move(result));
@@ -1146,17 +1151,21 @@ void ShowProfileStylingBox(not_null<Window::SessionController*> controller) {
 				container,
 				botButtonText->value(),
 				st::settingsButtonNoIcon));
+		const auto weakController = base::make_weak(controller);
 		botButton->setClickedCallback([=] {
 			controller->showToast(u"Setting up MoltenGram Sync bot via @BotFather..."_q);
 			EnsureBotReady(session, true, crl::guard(box, [=](BotSetupResult res) {
+				const auto strong = weakController.get();
 				if (res.success) {
 					Extera::Config::Instance().setBool(u"molten_bot_profile_sync"_q, true);
 					*botButtonText = botStatusText();
 					MoltenProfile::ResyncSelfMetadata(session, nullptr);
-					controller->showToast(
-						u"Companion bot @"_q + res.botUsername + u" ready!"_q);
-				} else if (res.errorType != ErrorType::AlreadyInProgress) {
-					controller->showToast(res.formatUserMessage());
+					if (strong) {
+						strong->showToast(
+							u"Companion bot @"_q + res.botUsername + u" ready!"_q);
+					}
+				} else if (res.errorType != ErrorType::AlreadyInProgress && strong) {
+					strong->showToast(res.formatUserMessage());
 				}
 			}));
 		});
@@ -1280,7 +1289,7 @@ void ShowProfileStylingBox(not_null<Window::SessionController*> controller) {
 			MoltenProfile::UpdateSelfMetadata(
 				session,
 				state->meta,
-				crl::guard(session, [=](bool ok) {
+				crl::guard(controller, [=](bool ok) {
 					controller->showToast(ok
 						? u"Profile styling updated!"_q
 						: u"Saved locally (profile sync failed)."_q);

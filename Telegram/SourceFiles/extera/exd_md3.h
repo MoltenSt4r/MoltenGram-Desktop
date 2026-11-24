@@ -9,6 +9,8 @@
 #include <QtGui/QPainter>
 #include <QtGui/QPainterPath>
 
+#include <vector>
+
 namespace Window {
 class SessionController;
 } // namespace Window

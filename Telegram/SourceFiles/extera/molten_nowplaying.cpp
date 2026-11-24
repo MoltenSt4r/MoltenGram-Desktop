@@ -33,6 +33,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/vertical_list.h"
 #include "window/window_session_controller.h"
 
+#include <QtCore/QCoreApplication>
 #include <QtCore/QCryptographicHash>
 #include <QtCore/QDateTime>
 #include <QtCore/QJsonArray>
@@ -65,8 +66,11 @@ constexpr auto kDefaultLastFmSecret = "425b0f4a86470f7e904bd25e15bf9429";
 constexpr auto kDefaultMusicNoteDocId = DocumentId(5334751416972093240ULL);
 
 [[nodiscard]] QNetworkAccessManager *NetworkManager() {
-	static auto nam = std::make_unique<QNetworkAccessManager>();
-	return nam.get();
+	if (!QCoreApplication::instance()) {
+		return nullptr;
+	}
+	static auto *const nam = new QNetworkAccessManager(qApp);
+	return nam;
 }
 
 } // namespace
@@ -315,7 +319,9 @@ Service::Service() {
 }
 
 Service::~Service() {
-	clearBroadcast();
+	if (QCoreApplication::instance() && !Core::Quitting()) {
+		clearBroadcast();
+	}
 }
 
 void Service::init(not_null<Main::Session*> session) {
@@ -424,15 +430,16 @@ void Service::applyToBio(const TrackInfo &track) {
 		ZeroWidthHiddenEnabled());
 
 	using Flag = MTPaccount_UpdateProfile::Flag;
-	_session->api().request(MTPaccount_UpdateProfile(
+	const auto session = _session;
+	session->api().request(MTPaccount_UpdateProfile(
 		MTP_flags(Flag::f_about),
 		MTPstring(),
 		MTPstring(),
 		MTP_string(stamped)
-	)).done([=](const MTPUser &result) {
-		_session->data().processUser(result);
-		_session->user()->setAbout(stamped);
-	}).send();
+	)).done(crl::guard(session, [=](const MTPUser &result) {
+		session->data().processUser(result);
+		session->user()->setAbout(stamped);
+	})).send();
 }
 
 void Service::restoreBio() {
@@ -442,15 +449,16 @@ void Service::restoreBio() {
 	_bioSaved = false;
 
 	using Flag = MTPaccount_UpdateProfile::Flag;
-	_session->api().request(MTPaccount_UpdateProfile(
+	const auto session = _session;
+	session->api().request(MTPaccount_UpdateProfile(
 		MTP_flags(Flag::f_about),
 		MTPstring(),
 		MTPstring(),
 		MTP_string(_originalBio)
-	)).done([=](const MTPUser &result) {
-		_session->data().processUser(result);
-		_session->user()->setAbout(_originalBio);
-	}).send();
+	)).done(crl::guard(session, [=](const MTPUser &result) {
+		session->data().processUser(result);
+		session->user()->setAbout(_originalBio);
+	})).send();
 }
 
 void Service::applyToEmojiStatus(const TrackInfo &track) {
@@ -534,7 +542,9 @@ void Service::updateLastFmNowPlaying(const TrackInfo &track) {
 
 	auto request = QNetworkRequest(QUrl(u"https://ws.audioscrobbler.com/2.0/"_q));
 	request.setHeader(QNetworkRequest::ContentTypeHeader, u"application/x-www-form-urlencoded"_q);
-	NetworkManager()->post(request, query.query(QUrl::FullyEncoded).toUtf8());
+	if (const auto nam = NetworkManager()) {
+		nam->post(request, query.query(QUrl::FullyEncoded).toUtf8());
+	}
 }
 
 void Service::scrobbleLastFm(const TrackInfo &track) {
@@ -575,7 +585,9 @@ void Service::scrobbleLastFm(const TrackInfo &track) {
 
 	auto request = QNetworkRequest(QUrl(u"https://ws.audioscrobbler.com/2.0/"_q));
 	request.setHeader(QNetworkRequest::ContentTypeHeader, u"application/x-www-form-urlencoded"_q);
-	NetworkManager()->post(request, query.query(QUrl::FullyEncoded).toUtf8());
+	if (const auto nam = NetworkManager()) {
+		nam->post(request, query.query(QUrl::FullyEncoded).toUtf8());
+	}
 }
 
 void Service::fetchLastFmRecent(
@@ -592,10 +604,18 @@ void Service::fetchLastFmRecent(
 
 	auto request = QNetworkRequest(url);
 	request.setRawHeader("User-Agent", "Mozilla/5.0 (X11; Linux x86_64; MoltenGram Desktop)");
-	auto *reply = NetworkManager()->get(request);
+	const auto nam = NetworkManager();
+	if (!nam) {
+		if (callback) callback(std::nullopt);
+		return;
+	}
+	auto *reply = nam->get(request);
 
-	QObject::connect(reply, &QNetworkReply::finished, [reply, callback] {
+	QObject::connect(reply, &QNetworkReply::finished, reply, [reply, callback] {
 		reply->deleteLater();
+		if (Core::Quitting()) {
+			return;
+		}
 		if (reply->error() != QNetworkReply::NoError) {
 			if (callback) callback(std::nullopt);
 			return;

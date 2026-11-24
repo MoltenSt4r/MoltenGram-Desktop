@@ -73,8 +73,18 @@ def api_json(url):
             with urllib.request.urlopen(request(url, True), timeout=30) as response:
                 return json.loads(response.read().decode('utf-8'))
         except Exception as e:
+            delay = min(30, 2 * (attempt + 1))
+            headers = getattr(e, 'headers', None)
+            if headers:
+                retry_after = headers.get('Retry-After')
+                reset = headers.get('X-RateLimit-Reset')
+                remaining = headers.get('X-RateLimit-Remaining')
+                if retry_after and retry_after.isdigit():
+                    delay = min(60, max(delay, int(retry_after) + 1))
+                elif remaining == '0' and reset and reset.isdigit():
+                    delay = min(60, max(delay, int(reset) - int(time.time()) + 1))
             print('API retry ' + str(attempt + 1) + ': ' + str(e), flush=True)
-            time.sleep(2)
+            time.sleep(delay)
     raise RuntimeError('API failed ' + url)
 
 

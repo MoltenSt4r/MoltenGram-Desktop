@@ -287,6 +287,9 @@ constexpr int kListenSeconds = 5;
 		av_frame_free(&frame);
 		av_packet_free(&pkt);
 	});
+	if (!frame || !pkt) {
+		return result;
+	}
 
 	const int targetSamples = kSampleRate * maxSeconds;
 	result.reserve(targetSamples);
@@ -303,6 +306,9 @@ constexpr int kListenSeconds = 5;
 		}
 		while (avcodec_receive_frame(codecCtx, frame) >= 0) {
 			const int outCount = swr_get_out_samples(swr, frame->nb_samples);
+			if (outCount <= 0) {
+				continue;
+			}
 			const auto curSize = result.size();
 			result.resize(curSize + outCount);
 			auto *outPtr = reinterpret_cast<uint8_t*>(result.data() + curSize);
@@ -708,10 +714,16 @@ rpl::producer<State> Service::stateChanges() const {
 void Service::cancel() {
 	if (_micListening) {
 		_micListening = false;
-		Media::Capture::instance()->stop();
+		if (const auto capture = Media::Capture::instance()) {
+			capture->stop();
+		}
 	}
 	_capturedBuffer.clear();
-	setState(State::Idle);
+	if (QCoreApplication::instance() && !Core::Quitting()) {
+		setState(State::Idle);
+	} else {
+		_state = State::Idle;
+	}
 }
 
 std::optional<TrackResult> Service::readDiskCache(const QString &cacheKey) {
@@ -816,13 +828,19 @@ void Service::recognizeAudioBuffer(
 	const auto wavData = MakeWav(resampled.data(), int(resampled.size()), kSampleRate);
 
 	const auto provider = CurrentProvider();
+	const auto weakController = base::make_weak(controller);
 	if (provider == Provider::AudD) {
 		queryAudD(wavData, [=](std::optional<TrackResult> res) {
+			const auto strong = weakController.get();
+			if (!strong) {
+				if (callback) callback(res && !res->empty() ? res : std::nullopt);
+				return;
+			}
 			if (res && !res->empty()) {
 				writeDiskCache(cacheKey, *res);
-				finishWithResult(controller, res, callback);
+				finishWithResult(strong, res, callback);
 			} else {
-				finishWithResult(controller, std::nullopt, callback);
+				finishWithResult(strong, std::nullopt, callback);
 			}
 		});
 		return;
@@ -838,11 +856,19 @@ void Service::recognizeAudioBuffer(
 						updated.coverUrl = cover;
 					}
 					writeDiskCache(cacheKey, updated);
-					finishWithResult(controller, updated, callback);
+					if (const auto strong = weakController.get()) {
+						finishWithResult(strong, updated, callback);
+					} else if (callback) {
+						callback(updated);
+					}
 				});
 			} else {
 				writeDiskCache(cacheKey, *shazamRes);
-				finishWithResult(controller, shazamRes, callback);
+				if (const auto strong = weakController.get()) {
+					finishWithResult(strong, shazamRes, callback);
+				} else if (callback) {
+					callback(shazamRes);
+				}
 			}
 			return;
 		}
@@ -858,18 +884,30 @@ void Service::recognizeAudioBuffer(
 								updated.coverUrl = cover;
 							}
 							writeDiskCache(cacheKey, updated);
-							finishWithResult(controller, updated, callback);
+							if (const auto strong = weakController.get()) {
+								finishWithResult(strong, updated, callback);
+							} else if (callback) {
+								callback(updated);
+							}
 						});
 					} else {
 						writeDiskCache(cacheKey, *auddRes);
-						finishWithResult(controller, auddRes, callback);
+						if (const auto strong = weakController.get()) {
+							finishWithResult(strong, auddRes, callback);
+						} else if (callback) {
+							callback(auddRes);
+						}
 					}
-				} else {
-					finishWithResult(controller, std::nullopt, callback);
+				} else if (const auto strong = weakController.get()) {
+					finishWithResult(strong, std::nullopt, callback);
+				} else if (callback) {
+					callback(std::nullopt);
 				}
 			});
-		} else {
-			finishWithResult(controller, std::nullopt, callback);
+		} else if (const auto strong = weakController.get()) {
+			finishWithResult(strong, std::nullopt, callback);
+		} else if (callback) {
+			callback(std::nullopt);
 		}
 	});
 }
@@ -889,10 +927,16 @@ void Service::recognizeFromMic(
 	_captureFrequency = 48000;
 
 	const auto capture = Media::Capture::instance();
+	if (!capture) {
+		_micListening = false;
+		finishWithResult(controller, std::nullopt, callback);
+		return;
+	}
 	if (!capture->available()) {
 		capture->check();
 	}
 
+	const auto weakController = base::make_weak(controller);
 	// Capture OpenAL microphone chunks
 	capture->start([=](Media::Capture::Chunk chunk) {
 		crl::on_main(this, [=, chunk = std::move(chunk)]() mutable {
@@ -907,9 +951,16 @@ void Service::recognizeFromMic(
 			const int neededBytes = _captureFrequency * kListenSeconds * sizeof(int16_t);
 			if (_capturedBuffer.size() >= neededBytes) {
 				_micListening = false;
-				Media::Capture::instance()->stop();
+				if (const auto cap = Media::Capture::instance()) {
+					cap->stop();
+				}
 				const auto buffer = base::take(_capturedBuffer);
-				recognizeAudioBuffer(controller, buffer, _captureFrequency, callback);
+				if (const auto strong = weakController.get()) {
+					recognizeAudioBuffer(strong, buffer, _captureFrequency, callback);
+				} else {
+					setState(State::Idle);
+					if (callback) callback(std::nullopt);
+				}
 			}
 		});
 	});
@@ -918,12 +969,21 @@ void Service::recognizeFromMic(
 	base::call_delayed(6500, this, [=] {
 		if (_micListening) {
 			_micListening = false;
-			Media::Capture::instance()->stop();
+			if (const auto cap = Media::Capture::instance()) {
+				cap->stop();
+			}
+			const auto strong = weakController.get();
+			if (!strong) {
+				_capturedBuffer.clear();
+				setState(State::Idle);
+				if (callback) callback(std::nullopt);
+				return;
+			}
 			if (!_capturedBuffer.isEmpty()) {
 				const auto buffer = base::take(_capturedBuffer);
-				recognizeAudioBuffer(controller, buffer, _captureFrequency, callback);
+				recognizeAudioBuffer(strong, buffer, _captureFrequency, callback);
 			} else {
-				finishWithResult(controller, std::nullopt, callback);
+				finishWithResult(strong, std::nullopt, callback);
 			}
 		}
 	});
@@ -969,18 +1029,28 @@ void Service::recognizeFile(
 		return;
 	}
 
+	const auto weakController = base::make_weak(controller);
 	// Decode in background thread
 	crl::async([=] {
 		auto pcm = DecodeAudioSegment(filePath, 6);
 		crl::on_main(this, [=, pcm = std::move(pcm)]() mutable {
+			if (Core::Quitting()) {
+				return;
+			}
+			const auto strong = weakController.get();
+			if (!strong) {
+				setState(State::Idle);
+				if (callback) callback(std::nullopt);
+				return;
+			}
 			if (pcm.empty()) {
-				finishWithResult(controller, std::nullopt, callback);
+				finishWithResult(strong, std::nullopt, callback);
 				return;
 			}
 			const auto rawBytes = QByteArray(
 				reinterpret_cast<const char*>(pcm.data()),
 				int(pcm.size() * sizeof(int16_t)));
-			recognizeAudioBuffer(controller, rawBytes, kSampleRate, callback);
+			recognizeAudioBuffer(strong, rawBytes, kSampleRate, callback);
 		});
 	});
 }
@@ -1025,16 +1095,23 @@ void Service::queryShazam(
 		"?sync=true&webv3=true&sampling=true&connected=&shazamapiversion=v3&sharehub=true&video=v3")
 		.arg(u1, u2);
 
-	auto nam = new QNetworkAccessManager(this);
+	if (!QCoreApplication::instance() || Core::Quitting()) {
+		if (callback) callback(std::nullopt);
+		return;
+	}
+	auto nam = new QNetworkAccessManager(qApp);
 	auto req = QNetworkRequest(QUrl(urlStr));
 	req.setHeader(QNetworkRequest::ContentTypeHeader, u"application/json"_q);
 	req.setRawHeader("Content-Language", "en_US");
 	req.setRawHeader("User-Agent", "Dalvik/2.1.0 (Linux; U; Android 13; Pixel 7 Build/TQ3A.230805.001)");
 
 	const auto reply = nam->post(req, QJsonDocument(body).toJson(QJsonDocument::Compact));
-	connect(reply, &QNetworkReply::finished, this, [=] {
+	connect(reply, &QNetworkReply::finished, reply, [=] {
 		reply->deleteLater();
 		nam->deleteLater();
+		if (Core::Quitting()) {
+			return;
+		}
 
 		if (reply->error() != QNetworkReply::NoError) {
 			if (callback) callback(std::nullopt);
@@ -1099,7 +1176,11 @@ void Service::queryAudD(
 		return;
 	}
 
-	auto nam = new QNetworkAccessManager(this);
+	if (!QCoreApplication::instance() || Core::Quitting()) {
+		if (callback) callback(std::nullopt);
+		return;
+	}
+	auto nam = new QNetworkAccessManager(qApp);
 	auto multiPart = new QHttpMultiPart(QHttpMultiPart::FormDataType, nam);
 
 	// Token
@@ -1133,9 +1214,12 @@ void Service::queryAudD(
 	const auto reply = nam->post(req, multiPart);
 	multiPart->setParent(reply);
 
-	connect(reply, &QNetworkReply::finished, this, [=] {
+	connect(reply, &QNetworkReply::finished, reply, [=] {
 		reply->deleteLater();
 		nam->deleteLater();
+		if (Core::Quitting()) {
+			return;
+		}
 
 		if (reply->error() != QNetworkReply::NoError) {
 			if (callback) callback(std::nullopt);
@@ -1207,11 +1291,18 @@ void Service::fetchCoverByMetadata(
 		+ QString::fromUtf8(QUrl::toPercentEncoding(query))
 		+ u"&media=music&entity=song&limit=1"_q);
 
-	auto nam = new QNetworkAccessManager(this);
+	if (!QCoreApplication::instance() || Core::Quitting()) {
+		if (callback) callback(QString());
+		return;
+	}
+	auto nam = new QNetworkAccessManager(qApp);
 	const auto reply = nam->get(QNetworkRequest(itunesUrl));
-	connect(reply, &QNetworkReply::finished, this, [=] {
+	connect(reply, &QNetworkReply::finished, reply, [=] {
 		reply->deleteLater();
 		nam->deleteLater();
+		if (Core::Quitting()) {
+			return;
+		}
 
 		if (reply->error() == QNetworkReply::NoError) {
 			const auto doc = QJsonDocument::fromJson(reply->readAll());
@@ -1231,11 +1322,14 @@ void Service::fetchCoverByMetadata(
 			u"https://api.deezer.com/search?q="_q
 			+ QString::fromUtf8(QUrl::toPercentEncoding(query))
 			+ u"&limit=1"_q);
-		auto dNam = new QNetworkAccessManager(this);
+		auto dNam = new QNetworkAccessManager(qApp);
 		const auto dReply = dNam->get(QNetworkRequest(deezerUrl));
-		connect(dReply, &QNetworkReply::finished, this, [=] {
+		connect(dReply, &QNetworkReply::finished, dReply, [=] {
 			dReply->deleteLater();
 			dNam->deleteLater();
+			if (Core::Quitting()) {
+				return;
+			}
 
 			if (dReply->error() == QNetworkReply::NoError) {
 				const auto doc = QJsonDocument::fromJson(dReply->readAll());
@@ -1268,11 +1362,18 @@ void Service::downloadCover(
 		return;
 	}
 
-	auto nam = new QNetworkAccessManager(this);
+	if (!QCoreApplication::instance() || Core::Quitting()) {
+		if (callback) callback(QString());
+		return;
+	}
+	auto nam = new QNetworkAccessManager(qApp);
 	const auto reply = nam->get(QNetworkRequest(QUrl(url)));
-	connect(reply, &QNetworkReply::finished, this, [=] {
+	connect(reply, &QNetworkReply::finished, reply, [=] {
 		reply->deleteLater();
 		nam->deleteLater();
+		if (Core::Quitting()) {
+			return;
+		}
 
 		if (reply->error() == QNetworkReply::NoError) {
 			QFile f(targetPath);
@@ -1389,7 +1490,9 @@ void Service::showResultBox(
 				rpl::single(u"📋  Copy Track Info"_q),
 				st::settingsButtonNoIcon));
 		copyBtn->setClickedCallback([=] {
-			QGuiApplication::clipboard()->setText(result.formatted());
+			if (const auto clipboard = QGuiApplication::clipboard()) {
+				clipboard->setText(result.formatted());
+			}
 			Ui::Toast::Show(u"Copied to clipboard"_q);
 		});
 

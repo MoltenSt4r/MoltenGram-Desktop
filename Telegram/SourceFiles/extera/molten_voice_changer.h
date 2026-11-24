@@ -13,6 +13,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include <QtCore/QByteArray>
 #include <QtCore/QVector>
 #include <cstdint>
+#include <cmath>
 #include <memory>
 #include <vector>
 

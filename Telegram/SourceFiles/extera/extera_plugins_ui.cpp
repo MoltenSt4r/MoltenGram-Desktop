@@ -2577,7 +2577,7 @@ void SendGuardReport(
 		MTP_flags(0),
 		MTP_string(u"MoltenGramPlugins"_q),
 		MTP_string()
-	)).done([=](const MTPcontacts_ResolvedPeer &result) {
+	)).done(crl::guard(session, [=](const MTPcontacts_ResolvedPeer &result) {
 		const auto &data = result.data();
 		session->data().processUsers(data.vusers());
 		session->data().processChats(data.vchats());
@@ -2586,23 +2586,27 @@ void SendGuardReport(
 		const auto monoforum = channel ? channel->monoforumLink() : nullptr;
 		if (monoforum && monoforum->amMonoforumAdmin()) {
 			if (const auto strong = weak.get()) {
-				QGuiApplication::clipboard()->setText(message);
+				if (const auto clipboard = QGuiApplication::clipboard()) {
+					clipboard->setText(message);
+				}
 				strong->showToast(tr::lng_exd_guard_report_admin(tr::now));
 			}
 		} else if (monoforum && monoforum->isLoaded()) {
 			send(monoforum);
 		} else if (const auto strong = weak.get()) {
-			QGuiApplication::clipboard()->setText(message);
+			if (const auto clipboard = QGuiApplication::clipboard()) {
+				clipboard->setText(message);
+			}
 			strong->showToast(tr::lng_exd_guard_report_copied(tr::now));
 			if (channel) {
 				strong->showPeerHistory(channel);
 			}
 		}
-	}).fail([=] {
+	})).fail(crl::guard(session, [=] {
 		if (const auto strong = weak.get()) {
 			strong->showToast(tr::lng_exd_guard_report_failed(tr::now));
 		}
-	}).send();
+	})).send();
 }
 
 [[nodiscard]] QColor GuardLevelColor(const QString &level) {
@@ -3337,20 +3341,22 @@ void ShowInstallBoxResolved(
 			const auto info = Call(u"install"_q, QJsonObject{
 				{ u"path"_q, path },
 			}).toObject();
-			const auto window = controller;
+			const auto window = base::make_weak(controller);
 			const auto updated = exists;
 			box->closeBox();
 			notifyListChanged();
-			window->showToast(info.value(u"installing"_q).toBool()
-				? tr::lng_exd_plugin_installing_deps_toast(tr::now, lt_name, name)
-				: info.value(u"error"_q).toString().isEmpty()
-				? (updated
-					? tr::lng_extera_plugins_updated(tr::now, lt_name, name)
-					: tr::lng_extera_plugins_installed_name(
-						tr::now,
-						lt_name,
-						name))
-				: tr::lng_extera_plugins_install_failed(tr::now));
+			if (const auto strong = window.get()) {
+				strong->showToast(info.value(u"installing"_q).toBool()
+					? tr::lng_exd_plugin_installing_deps_toast(tr::now, lt_name, name)
+					: info.value(u"error"_q).toString().isEmpty()
+					? (updated
+						? tr::lng_extera_plugins_updated(tr::now, lt_name, name)
+						: tr::lng_extera_plugins_installed_name(
+							tr::now,
+							lt_name,
+							name))
+					: tr::lng_extera_plugins_install_failed(tr::now));
+			}
 		});
 	}));
 }
@@ -3831,13 +3837,14 @@ void ShowInstallBox(
 }
 
 void ChooseAndInstall(not_null<Window::SessionController*> controller) {
+	const auto weak = base::make_weak(controller);
 	FileDialog::GetOpenPath(
 		Core::App().getFileDialogParent(),
 		tr::lng_extera_plugins_install(tr::now),
 		u"MoltenGram Desktop Plugin (*.plugin *.elyx *.eaf);;Python (*.py)"_q,
 		[=](FileDialog::OpenResult &&result) {
-			if (!result.paths.isEmpty()) {
-				ShowInstallBox(controller, result.paths.front(), false);
+			if (const auto strong = weak.get(); strong && !result.paths.isEmpty()) {
+				ShowInstallBox(strong, result.paths.front(), false);
 			}
 		});
 }

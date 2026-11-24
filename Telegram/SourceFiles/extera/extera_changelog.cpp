@@ -26,6 +26,7 @@
 #include "styles/style_layers.h"
 #include "styles/style_settings.h"
 
+#include <QtCore/QCoreApplication>
 #include <QtCore/QFile>
 #include <QtCore/QJsonArray>
 #include <QtCore/QJsonDocument>
@@ -128,8 +129,11 @@ void Load(Fn<void()> done) {
 	request.setRawHeader("Accept", "application/vnd.github+json");
 	request.setRawHeader("User-Agent", "MoltenGram-Desktop");
 	const auto reply = state.manager->get(request);
-	QObject::connect(reply, &QNetworkReply::finished, [=] {
+	QObject::connect(reply, &QNetworkReply::finished, reply, [=] {
 		reply->deleteLater();
+		if (Core::Quitting()) {
+			return;
+		}
 		if (reply->error() != QNetworkReply::NoError) {
 			Finish(false);
 			return;
@@ -335,6 +339,9 @@ void Start() {
 			return;
 		}
 		base::call_delayed(kShowDelay, [=] {
+			if (!Core::IsAppLaunched() || Core::Quitting()) {
+				return;
+			}
 			const auto window = Core::App().activePrimaryWindow();
 			if (const auto controller = window
 					? window->sessionController()

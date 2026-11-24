@@ -9,6 +9,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 #include "base/basic_types.h"
 #include "base/timer.h"
+#include "base/weak_ptr.h"
 #include "ui/rp_widget.h"
 
 #include <QtCore/QString>
@@ -131,7 +132,7 @@ private:
 	[[nodiscard]] int pillAt(const QPoint &pos) const;
 	void onPillClicked(int index);
 
-	Window::SessionController *_controller = nullptr;
+	base::weak_ptr<Window::SessionController> _controller;
 	std::vector<PillInfo> _pills;
 	int _hoveredIndex = -1;
 	int _pressedIndex = -1;

@@ -202,7 +202,7 @@ void Transcribes::loadLocal(not_null<HistoryItem*> item) {
 		Extera::Transcribe(
 			bytes,
 			round ? u"video/mp4"_q : u"audio/ogg"_q,
-			[=](QString text, bool ok) {
+			crl::guard(session, [=](QString text, bool ok) {
 				auto &entry = _map[id];
 				entry.pending = false;
 				entry.failed = !ok;
@@ -213,7 +213,7 @@ void Transcribes::loadLocal(not_null<HistoryItem*> item) {
 					}
 					session->data().requestItemResize(item);
 				}
-			});
+			}));
 	};
 	const auto tryRead = [=] {
 		auto bytes = view->bytes();

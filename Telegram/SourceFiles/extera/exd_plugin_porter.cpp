@@ -1,6 +1,7 @@
 #include "extera/exd_plugin_porter.h"
 
 #include "base/weak_qptr.h"
+#include "core/application.h"
 #include "extera/extera_config.h"
 #include "extera/extera_plugins.h"
 #include "extera/extera_plugins_ui.h"
@@ -14,6 +15,7 @@
 #include "styles/style_layers.h"
 #include "styles/style_settings.h"
 
+#include <QtCore/QCoreApplication>
 #include <QtCore/QDateTime>
 #include <QtCore/QDir>
 #include <QtCore/QFile>
@@ -446,8 +448,11 @@ std::shared_ptr<Job> Run(
 			strong->system,
 			strong->messages);
 		strong->reply = reply;
-		QObject::connect(reply, &QNetworkReply::finished, [=] {
+		QObject::connect(reply, &QNetworkReply::finished, reply, [=] {
 			reply->deleteLater();
+			if (Core::Quitting()) {
+				return;
+			}
 			const auto job = weak.lock();
 			if (!job || job->canceled) {
 				return;

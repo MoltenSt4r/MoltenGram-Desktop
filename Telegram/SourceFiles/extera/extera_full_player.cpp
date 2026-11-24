@@ -714,8 +714,13 @@ void View::applyCover(QImage image) {
 			2,
 			Qt::IgnoreAspectRatio,
 			Qt::SmoothTransformation);
-		_top = Darken(tiny.pixelColor(0, 0), 0.72);
-		_bottom = Darken(tiny.pixelColor(1, 1), 0.38);
+		if (!tiny.isNull() && tiny.width() >= 2 && tiny.height() >= 2) {
+			_top = Darken(tiny.pixelColor(0, 0), 0.72);
+			_bottom = Darken(tiny.pixelColor(1, 1), 0.38);
+		} else {
+			_top = QColor(52, 52, 64);
+			_bottom = QColor(18, 18, 24);
+		}
 		_backdrop = _cover.scaled(
 			12,
 			12,

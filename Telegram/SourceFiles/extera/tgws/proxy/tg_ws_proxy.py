@@ -32,7 +32,7 @@ from .fake_tls import (
 )
 from .balancer import balancer
 from .pool import ws_pool, cf_worker_pool
-from .cf_h2 import CfH2Pool
+from .cf_h2 import CfH2Pool, CF_H2_AVAILABLE
 from .network_debug import log_ws_flow
 from .event_loop import install_self_pipe_guard
 from ._aes import Cipher, algorithms, modes
@@ -387,7 +387,9 @@ async def _run(stop_event: Optional[asyncio.Event] = None):
     ws_pool.reset()
     cf_worker_pool.reset()
     _client_tasks.clear()
-    cf_h2_pool = CfH2Pool() if proxy_config.h2_enabled else None
+    cf_h2_pool = CfH2Pool() if (proxy_config.h2_enabled and CF_H2_AVAILABLE) else None
+    if proxy_config.h2_enabled and not CF_H2_AVAILABLE:
+        log.warning("CF H2 transport disabled (httpx/h2 packages unavailable); using WS fallback")
 
     user_cf_domains = proxy_config.cfproxy_user_domains
     if user_cf_domains:
@@ -701,12 +703,23 @@ def main():
     root.addHandler(console)
 
     if args.log_file:
-        from utils.logging_setup import build_log_handler
-        fh = build_log_handler(
-            args.log_file,
-            log_max_mb=args.log_max_mb,
-            backups=args.log_backups,
-        )
+        try:
+            from utils.logging_setup import build_log_handler
+            fh = build_log_handler(
+                args.log_file,
+                log_max_mb=args.log_max_mb,
+                backups=args.log_backups,
+            )
+        except ImportError:
+            from logging.handlers import RotatingFileHandler
+            os.makedirs(os.path.dirname(os.path.abspath(args.log_file)), exist_ok=True)
+            fh = RotatingFileHandler(
+                args.log_file,
+                maxBytes=max(1, int(args.log_max_mb * 1024 * 1024)),
+                backupCount=max(1, int(args.log_backups)),
+                encoding='utf-8',
+            )
+            fh.setFormatter(log_fmt)
         fh.addFilter(DomainMaskFilter())
         root.addHandler(fh)
 

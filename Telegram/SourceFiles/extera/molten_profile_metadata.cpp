@@ -553,16 +553,16 @@ void CommitProfileTag(
 		MTP_string(newFirst),
 		MTP_string(newLast),
 		MTPstring()
-	)).done([=](const MTPUser &result) {
+	)).done(crl::guard(session, [=](const MTPUser &result) {
 		session->data().processUser(result);
 		if (callback) {
 			callback(true);
 		}
-	}).fail([=](const MTP::Error &) {
+	})).fail(crl::guard(session, [=](const MTP::Error &) {
 		if (callback) {
 			callback(false);
 		}
-	}).send();
+	})).send();
 }
 
 void SaveSelfMetadata(

@@ -31,6 +31,7 @@
 namespace Extera::PdfViewer {
 namespace {
 
+#ifdef Q_OS_WIN
 constexpr auto kMaxPages = 200;
 
 struct Page {
@@ -38,14 +39,22 @@ struct Page {
 	QImage image;
 };
 
-#ifdef Q_OS_WIN
 void Render(
 		const QString &path,
 		int width,
 		Fn<void(int count)> counted,
 		Fn<void(Page page)> rendered) {
 	crl::async([=] {
-		base::WinRT::Try([] { winrt::init_apartment(); });
+		auto inited = false;
+		base::WinRT::Try([&] {
+			winrt::init_apartment();
+			inited = true;
+		});
+		const auto uninit = gsl::finally([&] {
+			if (inited) {
+				base::WinRT::Try([] { winrt::uninit_apartment(); });
+			}
+		});
 		using namespace winrt::Windows::Data::Pdf;
 		using namespace winrt::Windows::Storage;
 		using namespace winrt::Windows::Storage::Streams;
@@ -81,7 +90,6 @@ void Render(
 		}
 	});
 }
-#endif
 
 [[nodiscard]] QColor Mix(QColor a, QColor b, float64 k) {
 	return QColor(
@@ -243,6 +251,7 @@ not_null<Ui::RpWidget*> AddMd3Header(
 	}, header->lifetime());
 	return header;
 }
+#endif
 
 } // namespace
 
@@ -341,7 +350,9 @@ void Show(
 				state->pages.push_back(page);
 			}
 		}, [=](Page page) {
-			if (!guard || page.index >= int(state->pages.size())) {
+			if (!guard
+				|| page.index < 0
+				|| page.index >= int(state->pages.size())) {
 				return;
 			}
 			const auto widget = state->pages[page.index];

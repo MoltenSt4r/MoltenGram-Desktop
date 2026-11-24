@@ -14,6 +14,7 @@
 #include "window/window_session_controller.h"
 #include "styles/style_layers.h"
 
+#include <QtCore/QCoreApplication>
 #include <QtCore/QJsonArray>
 #include <QtCore/QJsonDocument>
 #include <QtCore/QJsonObject>
@@ -141,8 +142,11 @@ void Open(const QString &payload) {
 	}
 	webview->widget()->show();
 	body->sizeValue() | rpl::on_next([=](QSize size) {
-		if (const auto widget = webview->widget()) {
-			widget->setGeometry(QRect(QPoint(), size));
+		const auto it = Entries.find(id);
+		if (it != Entries.end() && !it->second->closing && it->second->webview) {
+			if (const auto widget = it->second->webview->widget()) {
+				widget->setGeometry(QRect(QPoint(), size));
+			}
 		}
 	}, body->lifetime());
 	webview->setMessageHandler([=](const QJsonDocument &message) {
@@ -205,6 +209,13 @@ void Open(const QString &payload) {
 			webview->navigate(u"data:text/html;charset=utf-8;base64,"_q
 				+ QString::fromLatin1(document.toUtf8().toBase64()));
 		}
+	}
+	static auto quitHooked = false;
+	if (!quitHooked && qApp) {
+		quitHooked = true;
+		QObject::connect(qApp, &QCoreApplication::aboutToQuit, [] {
+			CloseAll();
+		});
 	}
 	const auto parent = controller->widget()->geometry();
 	panel->move(

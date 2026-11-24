@@ -1050,7 +1050,10 @@ void PaintCard(
 	}
 
 	// Card bounds centered horizontally in targetRect
-	const int cardW = std::clamp(targetRect.width() - 24, 260, options.cardWidth);
+	const int cardW = std::clamp(
+		targetRect.width() - 24,
+		std::min(260, options.cardWidth),
+		std::max(0, options.cardWidth));
 	const int cardH = std::min(targetRect.height() - 16, options.cardHeight);
 	const auto cardRect = QRect(
 		targetRect.x() + (targetRect.width() - cardW) / 2,
@@ -1190,26 +1193,45 @@ void ShowQrShareBox(
 			QMargins(0, 8, 0, 16));
 
 		// Dedicated footer with clean layout: 'PNG' on left, 'Copy Image' & 'Close' on right
+		const auto weakBox = base::make_weak(box.get());
+		const auto weakCard = QPointer<QrCardWidget>(cardWidget);
+		const auto weakController = base::make_weak(controller);
 		box->addLeftButton(rpl::single(u"PNG"_q), [=] {
+			if (!weakBox) {
+				return;
+			}
 			const auto path = QFileDialog::getSaveFileName(
-				box,
+				weakBox.get(),
 				u"Save MoltenGram QR Code"_q,
 				u"moltengram_qr.png"_q,
 				u"Images (*.png)"_q);
-			if (!path.isEmpty()) {
-				const auto img = RenderCard(effectiveLink, cardWidget->currentOptions());
+			if (!path.isEmpty() && weakCard) {
+				const auto img = RenderCard(
+					effectiveLink,
+					weakCard->currentOptions());
 				if (img.save(path)) {
-					controller->showToast(u"QR Code saved successfully"_q);
+					if (const auto strong = weakController.get()) {
+						strong->showToast(u"QR Code saved successfully"_q);
+					}
 				}
 			}
 		});
 
 		box->addButton(rpl::single(u"Copy Image"_q), [=] {
-			const auto img = RenderCard(effectiveLink, cardWidget->currentOptions());
-			auto mime = std::make_unique<QMimeData>();
-			mime->setImageData(img);
-			QGuiApplication::clipboard()->setMimeData(mime.release());
-			controller->showToast(u"QR Code copied to clipboard"_q);
+			if (!weakCard) {
+				return;
+			}
+			const auto img = RenderCard(
+				effectiveLink,
+				weakCard->currentOptions());
+			if (const auto clipboard = QGuiApplication::clipboard()) {
+				auto mime = std::make_unique<QMimeData>();
+				mime->setImageData(img);
+				clipboard->setMimeData(mime.release());
+			}
+			if (const auto strong = weakController.get()) {
+				strong->showToast(u"QR Code copied to clipboard"_q);
+			}
 		});
 
 		box->addButton(tr::lng_close(), [=] {

@@ -61,13 +61,34 @@ jobs:
             mac-libs-${{ matrix.name }}-
 
       - name: Build ThirdParty libraries
+        id: build_libs
         timeout-minutes: 300
         env:
           GH_TOKEN: ${{ github.token }}
-        run: ./tdesktop/Telegram/build/prepare/mac.sh silent ${{ matrix.prepare }}
+          GIT_TERMINAL_PROMPT: "0"
+        run: |
+          for attempt in 1 2 3; do
+            if ./tdesktop/Telegram/build/prepare/mac.sh silent ${{ matrix.prepare }}; then
+              exit 0
+            fi
+            if [ "$attempt" -lt 3 ]; then
+              echo "ThirdParty build failed on attempt $attempt, retrying in 15s..."
+              sleep 15
+            fi
+          done
+          exit 1
 
-      - name: Save ThirdParty libraries
-        if: always() && steps.libs.outputs.cache-hit != 'true'
+      - name: Save complete ThirdParty libraries
+        if: steps.libs.outputs.cache-hit != 'true' && steps.build_libs.outcome == 'success'
+        uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: |
+            ${{ github.workspace }}/Libraries
+            ${{ github.workspace }}/ThirdParty
+          key: ${{ steps.libs.outputs.cache-primary-key }}
+
+      - name: Save partial ThirdParty libraries
+        if: always() && !cancelled() && steps.libs.outputs.cache-hit != 'true' && steps.build_libs.outcome == 'failure'
         uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
         with:
           path: |
@@ -202,8 +223,19 @@ jobs:
           mkdir -p dmg
           ditto MoltenGram-Desktop.app dmg/MoltenGram-Desktop.app
           ln -s /Applications dmg/Applications
-          hdiutil create -volname "MoltenGram Desktop" -srcfolder dmg -ov -format UDZO \
-            "$GITHUB_WORKSPACE/MoltenGram-Desktop-macos-${{ matrix.name }}.$VERSION.dmg"
+          DMG_OUT="$GITHUB_WORKSPACE/MoltenGram-Desktop-macos-${{ matrix.name }}.$VERSION.dmg"
+          for attempt in 1 2 3 4 5; do
+            hdiutil detach "/Volumes/MoltenGram Desktop" -force >/dev/null 2>&1 || true
+            rm -f "$DMG_OUT"
+            if hdiutil create -volname "MoltenGram Desktop" -srcfolder dmg -ov -format UDZO "$DMG_OUT"; then
+              break
+            fi
+            if [ "$attempt" -eq 5 ]; then
+              echo "hdiutil create failed after 5 attempts"
+              exit 1
+            fi
+            sleep 5
+          done
 
       - name: Upload build artifact
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
