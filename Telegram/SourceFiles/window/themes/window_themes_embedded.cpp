@@ -297,7 +297,11 @@ std::optional<QColor> SystemAccentColor() {
 	if (Extera::Bool(u"md3_monet_dynamic"_q)) {
 		const auto hex = Extera::String(u"md3_monet_color"_q);
 		if (!hex.isEmpty()) {
+#if QT_VERSION >= QT_VERSION_CHECK(6, 4, 0)
+			const auto custom = QColor::fromString(hex);
+#else
 			const auto custom = QColor(hex);
+#endif
 			if (custom.isValid()) {
 				return custom;
 			}

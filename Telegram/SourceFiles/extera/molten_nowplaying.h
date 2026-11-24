@@ -19,6 +19,10 @@ namespace Main {
 class Session;
 } // namespace Main
 
+namespace Ui {
+class VerticalLayout;
+} // namespace Ui
+
 namespace Window {
 class SessionController;
 } // namespace Window

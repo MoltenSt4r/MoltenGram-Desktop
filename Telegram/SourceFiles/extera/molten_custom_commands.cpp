@@ -55,6 +55,8 @@ struct Store {
 		+ u"/molten_custom_commands.json"_q;
 }
 
+void Save();
+
 void EnsureLoaded() {
 	auto &state = State();
 	if (state.loaded) {

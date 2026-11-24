@@ -1097,7 +1097,7 @@ void ShowSettingsBox(not_null<Window::SessionController*> controller) {
 		Settings::AddButtonWithLabel(
 			content,
 			tr::lng_exd_monet_color(),
-			Config().stringChanges(
+			Config::Instance().stringChanges(
 				u"md3_monet_color"_q
 			) | rpl::map([](const QString &c) {
 				return c.isEmpty() ? u"System Accent"_q : c;
@@ -1109,7 +1109,7 @@ void ShowSettingsBox(not_null<Window::SessionController*> controller) {
 		Settings::AddButtonWithLabel(
 			content,
 			tr::lng_exd_icon_packs(),
-			Config().intChanges(
+			Config::Instance().intChanges(
 				u"icon_pack"_q
 			) | rpl::map([](int pack) {
 				switch (pack) {

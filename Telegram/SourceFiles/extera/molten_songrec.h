@@ -13,6 +13,10 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include <QtCore/QObject>
 #include <optional>
 
+namespace Ui {
+class VerticalLayout;
+} // namespace Ui
+
 namespace Window {
 class SessionController;
 } // namespace Window

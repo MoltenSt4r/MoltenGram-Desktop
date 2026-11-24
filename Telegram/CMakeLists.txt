@@ -2944,7 +2944,7 @@ if (build_macstore)
         COMMAND rm -rf $<TARGET_FILE_DIR:Telegram>/../Frameworks/Breakpad.framework/Resources/crash_report_sender.app
         COMMAND rm -rf $<TARGET_FILE_DIR:Telegram>/../Frameworks/Breakpad.framework/Resources/Inspector
     )
-else()
+elseif (APPLE)
     if (CMAKE_GENERATOR STREQUAL Xcode)
         set(bundle_identifier "org.moltengram.desktop$<$<CONFIG:Debug>:Debug>")
     else()
@@ -2952,6 +2952,8 @@ else()
     endif()
     set(bundle_entitlements "Telegram.entitlements")
     set(output_name "MoltenGram")
+else()
+    set(output_name "Telegram")
 endif()
 
 if (CMAKE_GENERATOR STREQUAL Xcode)
@@ -3021,9 +3023,15 @@ else()
     if (LINUX)
         target_link_options(Telegram PRIVATE "-Wl,-rpath,\\$ORIGIN/lib")
     endif()
-    add_custom_command(TARGET Telegram POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_CURRENT_SOURCE_DIR}/SourceFiles/extera/python $<TARGET_FILE_DIR:Telegram>/python/extera
-    )
+    if (APPLE)
+        add_custom_command(TARGET Telegram POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_CURRENT_SOURCE_DIR}/SourceFiles/extera/python $<TARGET_FILE_DIR:Telegram>/../Resources/python/extera
+        )
+    else()
+        add_custom_command(TARGET Telegram POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_CURRENT_SOURCE_DIR}/SourceFiles/extera/python $<TARGET_FILE_DIR:Telegram>/python/extera
+        )
+    endif()
 endif()
 
 if (MSVC)
