@@ -149,18 +149,7 @@ jobs:
           export PYTHONNOUSERSITE=1
           exec "\$DIR/MoltenGram-Desktop-bin" "\$@"
           SH
-              cat > "$PKG/moltengram-desktop.desktop" <<DESKTOP
-[Desktop Entry]
-Type=Application
-Name=MoltenGram Desktop
-Comment=Telegram client
-Exec=MoltenGram-Desktop -- %u
-Icon=moltengram-desktop
-Terminal=false
-Categories=Network;InstantMessaging;Chat;
-MimeType=x-scheme-handler/tg;application/x-moltengram-plugin;
-StartupWMClass=TelegramDesktop
-DESKTOP
+              printf "%s\n" "[Desktop Entry]" "Type=Application" "Name=MoltenGram Desktop" "Comment=Telegram client" "Exec=MoltenGram-Desktop -- %u" "Icon=moltengram-desktop" "Terminal=false" "Categories=Network;InstantMessaging;Chat;" "MimeType=x-scheme-handler/tg;application/x-moltengram-plugin;" "StartupWMClass=TelegramDesktop" > "$PKG/moltengram-desktop.desktop"
               chmod +x "$PKG/MoltenGram-Desktop" "$PKG/MoltenGram-Desktop-bin"
               PYTHONHOME="$PKG/python311" PYTHONNOUSERSITE=1 LD_LIBRARY_PATH="$PKG/lib" python3.11 -c "
           import sys
